@@ -4,7 +4,7 @@
 
 **Goal:** Refactor the ledger from hardcoded deposit/withdrawal entities to a classification-driven architecture with unified operations, atomic event-journal model, and pluggable webhook delivery.
 
-**Architecture:** Classification (科目) becomes the primary entity. Deposit and withdrawal are demoted to preset configurations. All operations share a unified `operations` table. Events are atomic with journals (same transaction). Channel adapters handle inbound webhooks. Event delivery is pluggable (sync callback for library mode, async HTTP for service mode).
+**Architecture:** Classification becomes the primary entity. Deposit and withdrawal are demoted to preset configurations. All operations share a unified `operations` table. Events are atomic with journals (same transaction). Channel adapters handle inbound webhooks. Event delivery is pluggable (sync callback for library mode, async HTTP for service mode).
 
 **Tech Stack:** Go 1.26+, chi v5, pgx v5, sqlc, shopspring/decimal, PostgreSQL 17
 

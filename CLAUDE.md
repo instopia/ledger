@@ -22,7 +22,7 @@ Hexagonal: `core/` (pure domain) -> `postgres/` (adapter) -> `service/` (orchest
 
 ### Core Concepts
 
-- **Classification (科目)** — the primary entity. Each classification can have a Lifecycle (state machine).
+- **Classification** — the primary entity. Each classification can have a Lifecycle (state machine).
 - **Booking** — an instance of a classification's lifecycle (replaces v1 Deposit/Withdrawal). "Book a deposit", "book a withdrawal" is standard banking terminology.
 - **Event** — atomic record of state transitions, written with the booking update.
 - **Journal** — double-entry accounting record, linked to the triggering event via `event_id`.

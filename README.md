@@ -5,20 +5,20 @@ Dual-mode: importable library or standalone HTTP service.
 
 ## Features
 
-Five-dimensional banking coverage — 冲/提/费/安全/审计:
+Five-dimensional banking coverage:
 
 ```
-冲 (Deposit)    Pending two-phase API · EVM channel adapter · tolerance settlement
-提 (Withdrawal) Lifecycle state machine · fund locking · fee templates
-费 (Fee)        First-class fee classification · fee_charge template
-安全 (Security) 10-check reconciliation · solvency check · advisory lock leader election
-审计 (Audit)    Balance trends · booking trace · reversal chain · OTEL trace propagation
+Deposit       Pending two-phase API · EVM channel adapter · tolerance settlement
+Withdrawal    Lifecycle state machine · fund locking · fee templates
+Fee           First-class fee classification · fee_charge template
+Security      10-check reconciliation · solvency check · advisory lock leader election
+Audit         Balance trends · booking trace · reversal chain · OTEL trace propagation
 ```
 
 Core engine capabilities:
 
 - **Double-entry accounting** -- every journal enforces `total_debit = total_credit` at the database level
-- **Classification-driven design** -- account classifications (科目) are the primary entity; deposit/withdrawal are preset configurations, not hardcoded types
+- **Classification-driven design** -- account classifications are the primary entity; deposit/withdrawal are preset configurations, not hardcoded types
 - **Lifecycle state machines** -- attach a generic state machine to any classification; bookings transition through declared states with audit-tracked events
 - **Atomic event-journal model** -- booking transitions and journal posts can share one transaction via `RunInTx`; pass `EventID` when posting the journal to backfill `events.journal_id` and `bookings.journal_id`
 - **Entry templates** -- reusable debit/credit recipes; `ExecuteTemplate` for single posts, `ExecuteTemplateBatch` for atomic multi-step plans
@@ -39,70 +39,115 @@ Core engine capabilities:
 - **Async rollup worker** -- background checkpoint materialisation with `SKIP LOCKED` queue and leader election
 - **NO NULL policy** -- all DB columns `NOT NULL` with meaningful defaults; all Go fields are value types
 
-## Quick Start -- As a Library
+## Local Development with go.work
 
-**1. Install**
+To consume the local copy of `azex-ai/ledger` from a sibling Go module without
+publishing or `replace` directives, drop a workspace file at the parent
+directory:
 
 ```bash
-go get github.com/azex-ai/ledger@latest
+cd /path/to/parent          # e.g. /Users/aaron/azex
+cat > go.work <<'EOF'
+go 1.26.1
+
+use (
+    ./ledger
+    ./ledger/internal/postgrestest
+    ./your-consumer-module
+)
+EOF
+
+# The ledger repo ships its own go.work that only sees the inner modules;
+# the outer file supersedes it, so remove the inner one to avoid confusion.
+rm ledger/go.work
 ```
 
-**2. Connect and migrate**
+In your consumer's `go.mod`, ensure `go 1.26.1` (or add `toolchain go1.26.1`).
+The workspace file is git-ignored by convention, so this only affects local
+builds. For published consumers, switch to `go get github.com/azex-ai/ledger@<tag>`
+and delete the workspace.
+
+## Quick Start -- As a Library
+
+Two tiers: pick where you want to start.
+
+### Tier 1 — Hello Ledger (raw entries, no presets)
+
+The shortest path: post one balanced journal, read the resulting balance. Use
+this when you want to understand the primitives or you have your own
+chart-of-accounts and just need the engine.
 
 ```go
-pool, _ := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
-ledger.Migrate("postgres://user:pass@host/db?sslmode=disable")
+import (
+    "github.com/jackc/pgx/v5/pgxpool"
+    "github.com/shopspring/decimal"
+    "github.com/azex-ai/ledger"
+    "github.com/azex-ai/ledger/core"
+)
+
+ledger.Migrate(dbURL)                       // schema only — no metadata yet
+pool, _ := pgxpool.New(ctx, dbURL)
+svc, _ := ledger.New(pool)
+
+// Tier 1 still needs at least one Currency, Classification, and JournalType
+// row before any post — see examples/embed/main.go for a self-contained boot.
+
+j, err := svc.JournalWriter().PostJournal(ctx, core.JournalInput{
+    JournalTypeID:  jtID,
+    IdempotencyKey: ledger.NewIdempotencyKey("hello"),
+    Entries: []core.EntryInput{
+        {AccountHolder: -42, CurrencyID: 1, ClassificationID: clsID, EntryType: core.EntryTypeDebit,  Amount: decimal.NewFromInt(100)},
+        {AccountHolder:  42, CurrencyID: 1, ClassificationID: clsID, EntryType: core.EntryTypeCredit, Amount: decimal.NewFromInt(100)},
+    },
+    Source: "api",
+})
+
+bal, _ := svc.BalanceReader().GetBalance(ctx, 42, 1, clsID)
 ```
 
-**3. Wire and use**
+### Tier 2 — With Built-in Presets (recommended)
+
+Install the preset bundles and you immediately get classifications, journal
+types, and templates for deposits, withdrawals, fees, transfers, and more —
+all idempotent on every boot.
 
 ```go
-import "github.com/azex-ai/ledger"
+svc, _ := ledger.New(pool)
+svc.InstallExtendedPresets(ctx)              // 9 bundles, see "Built-in Presets" below
 
-// One call wires every postgres-backed store.
-svc, err := ledger.New(pool)
-if err != nil { return err }
+// Post a deposit confirmation by template — no entry-list assembly needed.
+_, err := svc.JournalWriter().ExecuteTemplate(ctx, "deposit_confirm", core.TemplateParams{
+    HolderID:       42,
+    CurrencyID:     1,
+    Amounts:        map[string]decimal.Decimal{"amount": decimal.NewFromInt(100)},
+    IdempotencyKey: ledger.NewIdempotencyKey("deposit-confirm"),
+    Source:         "api",
+})
 
-// Install the full preset catalogue (idempotent — safe to call every startup).
-if err := svc.InstallExtendedPresets(ctx); err != nil { return err }
-
-// Book a deposit
-booking, err := svc.Booker().CreateBooking(ctx, core.CreateBookingInput{
+// Or model a long-lived flow with a Booking and lifecycle transitions.
+booking, _ := svc.Booker().CreateBooking(ctx, core.CreateBookingInput{
     ClassificationCode: "deposit",
-    AccountHolder:      userID,
-    CurrencyID:         usdtID,
-    Amount:             amount,
+    AccountHolder:      42,
+    CurrencyID:         1,
+    Amount:             decimal.NewFromInt(100),
     IdempotencyKey:     ledger.NewIdempotencyKey("deposit"),
     ChannelName:        "evm",
 })
-
-// Drive the lifecycle
-_, err = svc.Booker().Transition(ctx, core.TransitionInput{
+svc.Booker().Transition(ctx, core.TransitionInput{
     BookingID: booking.ID,
     ToStatus:  "confirming",
     Source:    "api",
 })
-
-// Query balance (snapshot-consistent)
-balance, err := svc.BalanceReader().GetBalance(ctx, userID, usdtID, classID)
 ```
 
-**4. Run the background worker**
+Background worker (rollup, expiry, reconcile, snapshots, event delivery):
 
 ```go
 worker := svc.Worker(service.DefaultWorkerConfig())
-go worker.Run(ctx) // rollup, expiration, reconcile, snapshot, event delivery
+go worker.Run(ctx)
 ```
 
-**5. Add observability (optional)**
-
-```go
-import "github.com/azex-ai/ledger/observability"
-
-prom := observability.NewPrometheusMetrics()
-svc, _ := ledger.New(pool, ledger.WithMetrics(prom))
-http.Handle("/metrics", prom.Handler())
-```
+Observability (logger / metrics / tracing) is opt-in — see [Observability](#observability) below.
 
 ## Quick Start -- As a Service
 
@@ -114,6 +159,329 @@ docker compose up --build
 
 - API: <http://localhost:8080/api/v1/system/health>
 - Frontend: <http://localhost:3000>
+
+## Core Concepts
+
+The ledger is built on five primitives. Knowing them is enough to model any
+banking flow.
+
+| Primitive | What it is | Where it lives |
+|-----------|-----------|----------------|
+| **Currency** | Unit of value (USD, USDT, EUR, …). Has a precision. | `core.Currency` / `currencies` table |
+| **Classification** | Account type — "main_wallet", "pending", "fees", "equity", … Has `NormalSide` (debit-normal vs credit-normal) and an optional `Lifecycle` state machine. Positive holder = user-side, negative = system counterpart. | `core.Classification` / `classifications` table |
+| **Journal Type** | Categorises journals by intent — "deposit_confirm", "fee", "transfer". Required metadata before any post; think of it as the journal-entry kind in a chart of accounts. | `core.JournalType` / `journal_types` table |
+| **Entry Template** | Reusable recipe for a balanced journal: a list of `(classification, debit/credit, holder_role, amount_key)` lines. Render with `TemplateParams` to produce a `JournalInput`. | `core.EntryTemplate` / `entry_templates` table |
+| **Booking + Lifecycle** | Long-lived process record (e.g. a deposit attempt) tied to a Classification. Each `Transition` writes an Event and may post a Journal. | `core.Booking`, `core.Lifecycle` / `bookings` + `events` |
+
+When a journal is posted:
+
+- **Journal**: header row with idempotency key, totals, metadata.
+- **Entry**: each individual debit / credit line on the journal.
+- All entries must satisfy `SUM(debit) = SUM(credit)` per currency. Enforced by DB trigger.
+
+Before posting any journal, the database must contain at least:
+
+1. One **Currency**
+2. One **Classification**
+3. One **Journal Type**
+4. (Optional) **Entry Template** if you want `ExecuteTemplate` instead of building entries manually.
+
+Installing a preset bundle (next section) creates all of these in one call.
+
+## Built-in Presets
+
+The library ships nine preset bundles. Each is a self-contained set of
+classifications, journal types, and templates that wire one accounting flow
+end-to-end.
+
+| Bundle | Classifications introduced | Journal types | Templates | Purpose |
+|--------|---------------------------|---------------|-----------|---------|
+| `DepositBundle()` | `pending`, `main_wallet`, `suspense`, `custodial` | `deposit_pending`, `deposit_confirm`, `deposit_confirm_pending`, `deposit_release_pending`, `deposit_record_overage`, `deposit_resolve_overage`, `deposit_release_overage` | matching templates, one per journal type | Two-phase deposit (pending → confirmed) with tolerance & overage handling |
+| `WithdrawalBundle()` | `locked`, `fee_expense`, `fee_revenue` | `lock_funds`, `unlock_funds`, `withdraw_confirm`, `withdraw_fee` | `lock_funds`, `unlock_funds`, `withdraw_confirm`, `withdraw_fee` | Lock → reserve → confirm; fee templates |
+| `TransferBundle()` | `settlement` (system) | `transfer` | `transfer_out`, `transfer_in` | User-to-user via shared settlement pool (sender leg + receiver leg) |
+| `FeeBundle()` | `fees` (system) | `fee` | `fee_charge` | Generic platform fee: DR user main_wallet, CR system fees |
+| `CapitalBundle()` | `equity` (system) | `capital_injection`, `capital_withdraw` | matching | Platform equity movements |
+| `SettlementBundle()` | `settlement` (system), `fees` (system) | `checkout_settlement` | `checkout_settlement_gross`, `checkout_settlement_net` | Checkout settlement (gross or net-of-fee) into user wallet |
+| `CardBundle()` | `card_account` | `card_topup` | `card_topup_settle`, `card_topup_settle_net` | Top-up from main_wallet to card account; with optional fee variant |
+| `SpreadBundle()` | `spread` (system) | (none) | (none) | Registers the `spread` classification only — caller posts via `PostJournal` |
+| `FXBundle()` | (shared only) | `fx_sell`, `fx_buy` | matching | Per-currency FX leg pair sharing the settlement pool |
+
+Two convenience installers:
+
+```go
+svc.InstallDefaultPresets(ctx)    // Deposit + Withdrawal only
+svc.InstallExtendedPresets(ctx)   // All 9 bundles
+```
+
+Or install one bundle at a time:
+
+```go
+import "github.com/azex-ai/ledger/presets"
+
+presets.InstallTemplateBundle(ctx,
+    svc.Classifications(), svc.JournalTypes(), svc.Templates(),
+    presets.FeeBundle(),
+)
+```
+
+All installers are idempotent — safe to run on every startup. Existing rows
+are validated against the bundle and reused; mismatched `NormalSide` /
+`IsSystem` raise an error so a renamed preset cannot silently change semantics.
+
+Preset lifecycles (state machines for `Booker.Transition`):
+
+```go
+presets.DepositLifecycle      // pending → confirming → confirmed | failed | expired
+presets.WithdrawalLifecycle   // locked → reserved → reviewing → processing → confirmed | failed
+```
+
+## Recording Accounting
+
+Three ways to post a journal, in increasing order of abstraction.
+
+### 1. Direct — `PostJournal`
+
+You assemble the entry list. No template required. Use for one-off journals
+that don't have a reusable shape.
+
+```go
+svc.JournalWriter().PostJournal(ctx, core.JournalInput{
+    JournalTypeID:  jtID,
+    IdempotencyKey: key,
+    Entries: []core.EntryInput{
+        {AccountHolder:  42, CurrencyID: 1, ClassificationID: walletID, EntryType: core.EntryTypeDebit,  Amount: amt},
+        {AccountHolder: -42, CurrencyID: 1, ClassificationID: feesID,   EntryType: core.EntryTypeCredit, Amount: amt},
+    },
+    ActorID: 99, Source: "api",
+})
+```
+
+### 2. Template — `ExecuteTemplate`
+
+Renders a stored `EntryTemplate` (preset or your own) using `TemplateParams`,
+then calls `PostJournal`. Most application code lives here.
+
+```go
+svc.JournalWriter().ExecuteTemplate(ctx, "fee_charge", core.TemplateParams{
+    HolderID:       42,
+    CurrencyID:     1,
+    Amounts:        map[string]decimal.Decimal{"amount": amt},
+    IdempotencyKey: key,
+    Source:         "billing",
+})
+```
+
+`AmountKey` on each template line picks the value out of `Amounts`. Multiple
+keys per template (e.g. `amount` + `fee` for `withdraw_fee`) let one template
+encode multi-amount flows.
+
+### 3. Atomic Multi-Template — `ExecuteTemplateBatch`
+
+Runs several templates inside one transaction. All commit or all roll back
+together. Use for compound flows like "lock + charge fee" or "confirm pending +
+record overage".
+
+```go
+svc.TemplateBatchExecutor().ExecuteTemplateBatch(ctx, []core.TemplateExecutionRequest{
+    {TemplateCode: "lock_funds",   Params: lockParams},
+    {TemplateCode: "withdraw_fee", Params: feeParams},
+})
+```
+
+### Picking the right API
+
+| You have… | Use |
+|----------|-----|
+| One reusable shape, single currency, single holder | `ExecuteTemplate` |
+| Several reusable shapes that must succeed together | `ExecuteTemplateBatch` |
+| Cross-currency, cross-holder, or one-off entries | `PostJournal` directly |
+| A whole flow tied to a long-lived state | `Booker.Transition` (with optional `EventID` linkage to a journal) |
+
+## Extending the Ledger
+
+You write data, not code — the same primitives the presets use are public.
+
+### Add a custom classification
+
+```go
+clsStore := svc.Classifications()
+clsStore.CreateClassification(ctx, core.ClassificationInput{
+    Code:       "promotion_credit",
+    Name:       "Promotion Credit",
+    NormalSide: core.NormalSideCredit,
+    IsSystem:   true,
+    Lifecycle:  nil,                  // label-only; pass non-nil to attach an FSM
+})
+```
+
+### Add a custom journal type
+
+```go
+svc.JournalTypes().CreateJournalType(ctx, core.JournalTypeInput{
+    Code: "promo_grant",
+    Name: "Promotion Grant",
+})
+```
+
+### Add a custom entry template
+
+```go
+svc.Templates().CreateTemplate(ctx, core.TemplateInput{
+    Code:          "promo_grant",
+    Name:          "Promotion Grant",
+    JournalTypeID: jtID,
+    Lines: []core.TemplateLineInput{
+        {ClassificationID: equityID, EntryType: core.EntryTypeDebit,  HolderRole: core.HolderRoleSystem, AmountKey: "amount", SortOrder: 1},
+        {ClassificationID: walletID, EntryType: core.EntryTypeCredit, HolderRole: core.HolderRoleUser,   AmountKey: "amount", SortOrder: 2},
+    },
+})
+```
+
+You can now `ExecuteTemplate(ctx, "promo_grant", …)` from anywhere.
+
+### Add a custom lifecycle (state machine)
+
+A lifecycle is JSON attached to a classification. Bookings against that
+classification can only transition along the declared edges.
+
+```go
+svc.Classifications().CreateClassification(ctx, core.ClassificationInput{
+    Code:       "kyc_review",
+    Name:       "KYC Review",
+    NormalSide: core.NormalSideDebit,
+    Lifecycle: &core.Lifecycle{
+        Initial:  "submitted",
+        Terminal: []core.Status{"approved", "rejected"},
+        Transitions: map[core.Status][]core.Status{
+            "submitted": {"reviewing", "rejected"},
+            "reviewing": {"approved", "rejected"},
+        },
+    },
+})
+```
+
+`svc.Booker().Transition` will validate against this FSM. Invalid transitions
+return `core.ErrInvalidTransition`.
+
+### Add a custom channel adapter (inbound webhooks)
+
+Implement `channel.Adapter` for any external system that needs to drive
+booking transitions via signed webhooks:
+
+```go
+type StripeAdapter struct{ secret string }
+
+func (a *StripeAdapter) Name() string { return "stripe" }
+
+func (a *StripeAdapter) VerifySignature(h http.Header, body []byte) error {
+    // verify Stripe-Signature header...
+}
+
+func (a *StripeAdapter) ParseCallback(h http.Header, body []byte) (*channel.CallbackPayload, error) {
+    // unmarshal body, return BookingID + ChannelRef + Status + ActualAmount
+}
+
+svc.RegisterChannel("stripe", &StripeAdapter{secret: os.Getenv("STRIPE_SECRET")})
+```
+
+`POST /api/v1/webhooks/stripe` will now route through your adapter.
+
+### Compose ledger writes with your own DB writes — `RunInTx`
+
+When the ledger journal must succeed or fail atomically with rows in your own
+schema, hand the ledger and the raw `pgx.Tx` to one transaction:
+
+```go
+err := svc.RunInTx(ctx, func(tx *ledger.Service) error {
+    if _, err := tx.JournalWriter().ExecuteTemplate(ctx, "transfer", params); err != nil {
+        return err
+    }
+    _, err := tx.DBTX().Exec(ctx, "INSERT INTO my_table (...) VALUES (...)")
+    return err
+})
+```
+
+Use `tx.DBTX()` (not `Pool()`) inside the callback — `Pool` ignores the
+surrounding transaction and would commit out-of-band.
+
+### What changes when you add what
+
+| Want to add… | Change |
+|--------------|--------|
+| New classification | Insert one row via `Classifications()` |
+| New journal type | Insert one row via `JournalTypes()` |
+| New reusable journal shape | Insert template via `Templates()` |
+| New stateful flow (e.g. KYC) | Add classification with `Lifecycle` JSON; use `Booker` |
+| New webhook source | Implement `channel.Adapter`; `RegisterChannel` at boot |
+| Entry-line semantics not expressible by templates | Drop to `PostJournal` directly — templates are not Turing-complete by design |
+| New balance metric | Implement `core.Metrics`, pass via `WithMetrics(...)`; or wrap the Prometheus adapter |
+| Non-Postgres persistence | Implement the relevant `core/*` interfaces; the domain layer does not assume Postgres |
+
+## Observability
+
+Three pluggable surfaces. All three default to no-op — you opt in.
+
+### Logger
+
+Implement `core.Logger` (`Info` / `Warn` / `Error`) and inject:
+
+```go
+import "log/slog"
+
+type slogAdapter struct{ l *slog.Logger }
+func (s slogAdapter) Info(m string, a ...any)  { s.l.Info(m, a...) }
+func (s slogAdapter) Warn(m string, a ...any)  { s.l.Warn(m, a...) }
+func (s slogAdapter) Error(m string, a ...any) { s.l.Error(m, a...) }
+
+logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+svc, _ := ledger.New(pool, ledger.WithLogger(slogAdapter{l: logger}))
+```
+
+Same shape works for `zap`, `zerolog`, or any structured logger.
+
+### Metrics
+
+Implement `core.Metrics` (counters / histograms / gauges, full surface in
+[`core/metrics.go`](core/metrics.go)) and inject. The library ships one
+production-ready impl:
+
+```go
+import "github.com/azex-ai/ledger/observability"
+
+prom := observability.NewPrometheusMetrics()
+svc, _ := ledger.New(pool, ledger.WithMetrics(prom))
+
+http.Handle("/metrics", prom.Handler())
+go http.ListenAndServe(":9090", nil)
+```
+
+Exposed metrics include `ledger_journals_posted_total`,
+`ledger_journal_latency_seconds`, `ledger_reservations_active`,
+`ledger_pending_rollups`, `ledger_balance_drift`, `ledger_reconcile_gap`, and
+more. Cardinality is bounded by design: `journalTypeCode` and `classCode` are
+stable enums, currency IDs are small integers.
+
+For OpenTelemetry, DataDog, or any other backend, write a thin adapter
+against `core.Metrics`. The interface is intentionally narrow (~20 methods).
+
+### Distributed tracing
+
+OTEL trace propagation is automatic on the journal / booking write paths —
+spans named `ledger.ledger.post_journal`, `ledger.booking.transition`, etc.,
+are emitted whenever the active context has a tracer. No injection needed;
+just configure the global tracer provider before calling `ledger.New`:
+
+```go
+import (
+    "go.opentelemetry.io/otel"
+    "go.opentelemetry.io/otel/sdk/trace"
+)
+
+tp := trace.NewTracerProvider(/* exporter, sampler, ... */)
+otel.SetTracerProvider(tp)
+
+// All ledger operations now emit spans into your collector.
+```
 
 ## API Surface
 
@@ -310,7 +678,7 @@ See [docs/api.md](docs/api.md) for the complete reference with request/response 
 The current release series is **v0.x**. No API stability guarantees are made between minor versions while the library is in active development.
 
 **v1.0 milestone criteria**:
-- All five dimensions (冲/提/费/安全/审计) have been exercised in at least one production deployment
+- All five dimensions (deposit / withdrawal / fee / security / audit) have been exercised in at least one production deployment
 - HTTP API at OpenAPI 3.1 full coverage — see [docs/openapi.yaml](docs/openapi.yaml) (in progress)
 - The `core/` interface set is stable for at least two minor versions without breaking changes
 - INVARIANTS.md complete with every invariant pinned by a regression test — see [docs/INVARIANTS.md](docs/INVARIANTS.md)

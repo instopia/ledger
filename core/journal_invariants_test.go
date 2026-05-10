@@ -14,8 +14,9 @@ import (
 // Property: any balanced N-entry journal with random amounts always validates,
 // and Totals() reports the same per-side sum that the entries describe.
 //
-// This is the open-source ledger's headline invariant: 借贷恒等. It must hold
-// regardless of entry ordering, count, or which side the random amount lands.
+// This is the open-source ledger's headline invariant: debit-credit equality.
+// It must hold regardless of entry ordering, count, or which side the random
+// amount lands.
 func TestJournalInvariant_BalancedRandomEntries(t *testing.T) {
 	rng := rand.New(rand.NewSource(0xC0FFEE))
 
