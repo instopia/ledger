@@ -3,6 +3,7 @@ import {
   useQueryClient,
   type MutationFunction,
 } from "@tanstack/react-query";
+import { ledgerKeyPrefix } from "./keys";
 
 /**
  * Wrapper around useMutation that automatically invalidates balance-related
@@ -21,10 +22,12 @@ export function useLedgerMutation<TData, TVariables>(
     mutationFn,
     onSuccess: () => {
       for (const key of invalidateKeys) {
-        qc.invalidateQueries({ queryKey: ["ledger", key] });
+        // Namespace each caller-passed bare segment under the package root
+        // prefix; no raw "ledger" literal lives here.
+        qc.invalidateQueries({ queryKey: [...ledgerKeyPrefix.all, key] });
       }
-      qc.invalidateQueries({ queryKey: ["ledger", "balances"] });
-      qc.invalidateQueries({ queryKey: ["ledger", "system-balances"] });
+      qc.invalidateQueries({ queryKey: ledgerKeyPrefix.balances });
+      qc.invalidateQueries({ queryKey: ledgerKeyPrefix.systemBalances });
     },
   });
 }

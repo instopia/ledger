@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLedgerClient } from "../provider/context";
 import type { LedgerClient } from "../client/client";
-import { ledgerKeys } from "./keys";
+import { ledgerKeys, ledgerKeyPrefix } from "./keys";
 
 // ─── Classifications ─────────────────────────────────────────────────
 
@@ -20,7 +20,7 @@ export function useCreateClassification() {
     mutationFn: (body: Parameters<LedgerClient["createClassification"]>[0]) =>
       client.createClassification(body),
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["ledger", "classifications"] }),
+      qc.invalidateQueries({ queryKey: ledgerKeyPrefix.classifications }),
   });
 }
 
@@ -30,7 +30,7 @@ export function useDeactivateClassification() {
   return useMutation({
     mutationFn: (id: number) => client.deactivateClassification(id),
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["ledger", "classifications"] }),
+      qc.invalidateQueries({ queryKey: ledgerKeyPrefix.classifications }),
   });
 }
 
@@ -51,7 +51,7 @@ export function useCreateJournalType() {
     mutationFn: (body: Parameters<LedgerClient["createJournalType"]>[0]) =>
       client.createJournalType(body),
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["ledger", "journal-types"] }),
+      qc.invalidateQueries({ queryKey: ledgerKeyPrefix.journalTypes }),
   });
 }
 
@@ -61,7 +61,7 @@ export function useDeactivateJournalType() {
   return useMutation({
     mutationFn: (id: number) => client.deactivateJournalType(id),
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["ledger", "journal-types"] }),
+      qc.invalidateQueries({ queryKey: ledgerKeyPrefix.journalTypes }),
   });
 }
 
@@ -82,7 +82,7 @@ export function useCreateTemplate() {
     mutationFn: (body: Parameters<LedgerClient["createTemplate"]>[0]) =>
       client.createTemplate(body),
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["ledger", "templates"] }),
+      qc.invalidateQueries({ queryKey: ledgerKeyPrefix.templates }),
   });
 }
 
@@ -92,7 +92,7 @@ export function useDeactivateTemplate() {
   return useMutation({
     mutationFn: (id: number) => client.deactivateTemplate(id),
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["ledger", "templates"] }),
+      qc.invalidateQueries({ queryKey: ledgerKeyPrefix.templates }),
   });
 }
 
@@ -130,7 +130,7 @@ export function useCreateCurrency() {
     mutationFn: (body: Parameters<LedgerClient["createCurrency"]>[0]) =>
       client.createCurrency(body),
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["ledger", "currencies"] }),
+      qc.invalidateQueries({ queryKey: ledgerKeyPrefix.currencies }),
   });
 }
 
@@ -140,6 +140,6 @@ export function useDeactivateCurrency() {
   return useMutation({
     mutationFn: (id: number) => client.deactivateCurrency(id),
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["ledger", "currencies"] }),
+      qc.invalidateQueries({ queryKey: ledgerKeyPrefix.currencies }),
   });
 }

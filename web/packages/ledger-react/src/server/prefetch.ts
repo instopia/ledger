@@ -14,6 +14,14 @@ type EntriesPage = Awaited<ReturnType<LedgerClient["listEntries"]>>;
 // here would silently drift and break hydration. The infinite-query helpers
 // mirror the hook's `initialPageParam` / `getNextPageParam` so the hydrated
 // shape matches `useInfiniteQuery`.
+//
+// INTENTIONAL OMISSION — bookings (deposit / withdraw): there is deliberately
+// no `prefetchBookings`. The `useDeposits` / `useWithdrawals` hooks key on a
+// resolved numeric `classificationId`, which itself comes from a separate
+// `classifications(true)` query. Prefetching bookings is therefore a two-step
+// server flow (resolve the classification id from prefetched classifications,
+// THEN list bookings under that id) that the caller must orchestrate — so it's
+// left to the host rather than hidden behind a single helper.
 
 /** Mirrors `useJournals(limit)` (infinite query). */
 export function prefetchJournals(

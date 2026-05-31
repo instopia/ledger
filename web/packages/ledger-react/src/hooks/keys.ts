@@ -54,3 +54,22 @@ export const ledgerKeys = {
     params: { holder?: number; status?: string; classificationId: number },
   ) => ["ledger", "bookings", code, params] as const,
 } as const;
+
+// Partial-key PREFIXES for namespace-wide invalidation. React Query's
+// `invalidateQueries` does a partial (prefix) match, so invalidating
+// `["ledger","balances"]` hits every `balances*` query regardless of its
+// trailing params. Mutations invalidate by namespace via these prefixes so the
+// namespace strings are NOT duplicated as raw literals at the call sites — a
+// rename in `ledgerKeys` must not silently break invalidation.
+export const ledgerKeyPrefix = {
+  all: ["ledger"] as const,
+  balances: ["ledger", "balances"] as const,
+  systemBalances: ["ledger", "system-balances"] as const,
+  journals: ["ledger", "journals"] as const,
+  bookings: ["ledger", "bookings"] as const,
+  classifications: ["ledger", "classifications"] as const,
+  journalTypes: ["ledger", "journal-types"] as const,
+  templates: ["ledger", "templates"] as const,
+  currencies: ["ledger", "currencies"] as const,
+  reservations: ["ledger", "reservations"] as const,
+} as const;
