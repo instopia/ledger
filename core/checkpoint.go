@@ -24,6 +24,10 @@ type RollupQueueItem struct {
 	CurrencyID       int64     `json:"currency_id"`
 	ClassificationID int64     `json:"classification_id"`
 	CreatedAt        time.Time `json:"created_at"`
+	// ClaimedUntil is the claim token set at dequeue. It is passed back to
+	// MarkRollupProcessed / ReleaseRollupClaim so a worker only acts on a claim
+	// it still owns (a concurrent re-dirty or re-claim changes this value).
+	ClaimedUntil time.Time `json:"claimed_until"`
 }
 
 // BalanceSnapshot stores a historical daily balance.

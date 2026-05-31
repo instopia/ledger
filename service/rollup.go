@@ -13,8 +13,11 @@ import (
 // RollupQueuer provides rollup queue read/write operations.
 type RollupQueuer interface {
 	DequeueRollupBatch(ctx context.Context, batchSize int) ([]core.RollupQueueItem, error)
-	MarkRollupProcessed(ctx context.Context, id int64) error
-	ReleaseRollupClaim(ctx context.Context, id int64) error
+	// MarkRollupProcessed marks the item processed only if claimToken still owns
+	// the claim. Returns false (no error) when the claim was lost to a concurrent
+	// re-dirty or re-claim, leaving the row pending for its rightful owner.
+	MarkRollupProcessed(ctx context.Context, id int64, claimToken time.Time) (bool, error)
+	ReleaseRollupClaim(ctx context.Context, id int64, claimToken time.Time) error
 	CountPendingRollups(ctx context.Context) (int64, error)
 	EnqueueRollup(ctx context.Context, holder, currencyID, classificationID int64) error
 }
@@ -81,7 +84,7 @@ func (s *RollupService) ProcessBatch(ctx context.Context, batchSize int) (int, e
 	clsList, err := s.classifications.ListClassifications(ctx, false)
 	if err != nil {
 		for _, item := range items {
-			if releaseErr := s.queue.ReleaseRollupClaim(ctx, item.ID); releaseErr != nil {
+			if releaseErr := s.queue.ReleaseRollupClaim(ctx, item.ID, item.ClaimedUntil); releaseErr != nil {
 				s.logger.Error("service: rollup: release claim failed",
 					"item_id", item.ID,
 					"error", releaseErr,
@@ -100,7 +103,7 @@ func (s *RollupService) ProcessBatch(ctx context.Context, batchSize int) (int, e
 	processed := 0
 	for _, item := range items {
 		if err := s.processItem(ctx, item, normalSides, classCodeMap); err != nil {
-			if releaseErr := s.queue.ReleaseRollupClaim(ctx, item.ID); releaseErr != nil {
+			if releaseErr := s.queue.ReleaseRollupClaim(ctx, item.ID, item.ClaimedUntil); releaseErr != nil {
 				s.logger.Error("service: rollup: release claim failed",
 					"item_id", item.ID,
 					"error", releaseErr,
@@ -159,7 +162,9 @@ func (s *RollupService) processItem(
 
 	// No new entries
 	if maxEntryID == 0 || maxEntryID <= sinceEntryID {
-		if err := s.queue.MarkRollupProcessed(ctx, item.ID); err != nil {
+		// No checkpoint write happened; if the claim was lost (marked=false) the
+		// rightful owner will reprocess, so there is nothing more to do either way.
+		if _, err := s.queue.MarkRollupProcessed(ctx, item.ID, item.ClaimedUntil); err != nil {
 			return fmt.Errorf("service: rollup: mark processed: %w", err)
 		}
 		return nil
@@ -214,9 +219,17 @@ func (s *RollupService) processItem(
 		return fmt.Errorf("service: rollup: upsert checkpoint: %w", err)
 	}
 
-	// Mark processed
-	if err := s.queue.MarkRollupProcessed(ctx, item.ID); err != nil {
+	// Mark processed (claim-token scoped). If the claim was lost to a concurrent
+	// re-dirty or re-claim, marked is false: our checkpoint upsert above was still
+	// valid (it is monotonic), but the rightful owner will reprocess this row, so
+	// we skip the coalesced-enqueue recovery and return without releasing (the
+	// caller only releases on a returned error, which we must not raise here).
+	marked, err := s.queue.MarkRollupProcessed(ctx, item.ID, item.ClaimedUntil)
+	if err != nil {
 		return fmt.Errorf("service: rollup: mark processed: %w", err)
+	}
+	if !marked {
+		return nil
 	}
 
 	// Recover a coalesced enqueue. A journal for THIS (holder, currency,

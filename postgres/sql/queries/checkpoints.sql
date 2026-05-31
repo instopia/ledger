@@ -51,26 +51,35 @@ UPDATE rollup_queue AS q
 SET claimed_until = $2
 FROM claimed
 WHERE q.id = claimed.id
-RETURNING q.id, q.account_holder, q.currency_id, q.classification_id, q.created_at;
+RETURNING q.id, q.account_holder, q.currency_id, q.classification_id, q.created_at, q.claimed_until;
 
--- name: MarkRollupProcessed :exec
--- Claim guard: only mark processed if our claim is still valid (claimed_until in
--- the future). If a concurrent EnqueueRollup re-dirtied the row (set
--- claimed_until = NULL) while we were processing, OR our claim lease expired,
--- this affects 0 rows and the row stays pending for reprocessing — so an enqueue
--- during processing is never lost.
+-- name: MarkRollupProcessed :execrows
+-- Claim-token guard: only mark processed if THIS worker still owns the claim —
+-- claimed_until must still equal the exact token we set at dequeue ($2, the value
+-- returned from DequeueRollupBatch). If a concurrent EnqueueRollup re-dirtied the
+-- row (claimed_until = NULL) or another worker re-claimed it (different
+-- claimed_until) while we were processing, this affects 0 rows and the row stays
+-- pending for its rightful owner — so an enqueue during processing is never lost,
+-- and a stale worker can never mark a claim it no longer owns. Returns rows
+-- affected so the caller can distinguish "marked" from "claim lost".
 UPDATE rollup_queue
 SET processed_at = now(), claimed_until = NULL
-WHERE id = $1 AND claimed_until > now();
+WHERE id = $1 AND claimed_until = $2;
 
 -- name: ReleaseRollupClaim :exec
 -- Release the claim *and* bump failed_attempts so a permanently-failing item
 -- can be detected and excluded from future batches (see DequeueRollupBatch).
+-- Claim-token scoped ($2): only the worker that owns the current claim releases
+-- it. If the row was re-dirtied (claimed_until = NULL) or re-claimed by another
+-- worker, this no-ops — a stale worker must not bump failed_attempts on work it
+-- no longer owns (else repeated races could falsely exhaust failed_attempts and
+-- exclude a live dimension).
 UPDATE rollup_queue
 SET claimed_until = NULL,
     failed_attempts = failed_attempts + 1
 WHERE id = $1
-  AND processed_at IS NULL;
+  AND processed_at IS NULL
+  AND claimed_until = $2;
 
 -- name: CountPendingRollups :one
 SELECT COUNT(*) FROM rollup_queue WHERE processed_at IS NULL;

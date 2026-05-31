@@ -74,7 +74,7 @@ UPDATE rollup_queue AS q
 SET claimed_until = $2
 FROM claimed
 WHERE q.id = claimed.id
-RETURNING q.id, q.account_holder, q.currency_id, q.classification_id, q.created_at
+RETURNING q.id, q.account_holder, q.currency_id, q.classification_id, q.created_at, q.claimed_until
 `
 
 type DequeueRollupBatchParams struct {
@@ -83,11 +83,12 @@ type DequeueRollupBatchParams struct {
 }
 
 type DequeueRollupBatchRow struct {
-	ID               int64     `json:"id"`
-	AccountHolder    int64     `json:"account_holder"`
-	CurrencyID       int64     `json:"currency_id"`
-	ClassificationID int64     `json:"classification_id"`
-	CreatedAt        time.Time `json:"created_at"`
+	ID               int64              `json:"id"`
+	AccountHolder    int64              `json:"account_holder"`
+	CurrencyID       int64              `json:"currency_id"`
+	ClassificationID int64              `json:"classification_id"`
+	CreatedAt        time.Time          `json:"created_at"`
+	ClaimedUntil     pgtype.Timestamptz `json:"claimed_until"`
 }
 
 // Skip items that have failed too many times (failed_attempts >= 10) — they
@@ -107,6 +108,7 @@ func (q *Queries) DequeueRollupBatch(ctx context.Context, arg DequeueRollupBatch
 			&i.CurrencyID,
 			&i.ClassificationID,
 			&i.CreatedAt,
+			&i.ClaimedUntil,
 		); err != nil {
 			return nil, err
 		}
@@ -345,20 +347,31 @@ func (q *Queries) ListBalancesAt(ctx context.Context, createdAt time.Time) ([]Li
 	return items, nil
 }
 
-const markRollupProcessed = `-- name: MarkRollupProcessed :exec
+const markRollupProcessed = `-- name: MarkRollupProcessed :execrows
 UPDATE rollup_queue
 SET processed_at = now(), claimed_until = NULL
-WHERE id = $1 AND claimed_until > now()
+WHERE id = $1 AND claimed_until = $2
 `
 
-// Claim guard: only mark processed if our claim is still valid (claimed_until in
-// the future). If a concurrent EnqueueRollup re-dirtied the row (set
-// claimed_until = NULL) while we were processing, OR our claim lease expired,
-// this affects 0 rows and the row stays pending for reprocessing — so an enqueue
-// during processing is never lost.
-func (q *Queries) MarkRollupProcessed(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, markRollupProcessed, id)
-	return err
+type MarkRollupProcessedParams struct {
+	ID           int64              `json:"id"`
+	ClaimedUntil pgtype.Timestamptz `json:"claimed_until"`
+}
+
+// Claim-token guard: only mark processed if THIS worker still owns the claim —
+// claimed_until must still equal the exact token we set at dequeue ($2, the value
+// returned from DequeueRollupBatch). If a concurrent EnqueueRollup re-dirtied the
+// row (claimed_until = NULL) or another worker re-claimed it (different
+// claimed_until) while we were processing, this affects 0 rows and the row stays
+// pending for its rightful owner — so an enqueue during processing is never lost,
+// and a stale worker can never mark a claim it no longer owns. Returns rows
+// affected so the caller can distinguish "marked" from "claim lost".
+func (q *Queries) MarkRollupProcessed(ctx context.Context, arg MarkRollupProcessedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markRollupProcessed, arg.ID, arg.ClaimedUntil)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const releaseRollupClaim = `-- name: ReleaseRollupClaim :exec
@@ -367,12 +380,23 @@ SET claimed_until = NULL,
     failed_attempts = failed_attempts + 1
 WHERE id = $1
   AND processed_at IS NULL
+  AND claimed_until = $2
 `
+
+type ReleaseRollupClaimParams struct {
+	ID           int64              `json:"id"`
+	ClaimedUntil pgtype.Timestamptz `json:"claimed_until"`
+}
 
 // Release the claim *and* bump failed_attempts so a permanently-failing item
 // can be detected and excluded from future batches (see DequeueRollupBatch).
-func (q *Queries) ReleaseRollupClaim(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, releaseRollupClaim, id)
+// Claim-token scoped ($2): only the worker that owns the current claim releases
+// it. If the row was re-dirtied (claimed_until = NULL) or re-claimed by another
+// worker, this no-ops — a stale worker must not bump failed_attempts on work it
+// no longer owns (else repeated races could falsely exhaust failed_attempts and
+// exclude a live dimension).
+func (q *Queries) ReleaseRollupClaim(ctx context.Context, arg ReleaseRollupClaimParams) error {
+	_, err := q.db.Exec(ctx, releaseRollupClaim, arg.ID, arg.ClaimedUntil)
 	return err
 }
 

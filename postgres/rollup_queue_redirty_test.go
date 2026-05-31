@@ -42,8 +42,10 @@ func TestRollupQueue_ReDirtyPreventsLostEnqueue(t *testing.T) {
 	require.NoError(t, adapter.EnqueueRollup(ctx, holder, currency, class))
 
 	// 4. Worker tries to finish: the claim guard must make this a no-op because
-	//    the row was re-dirtied.
-	require.NoError(t, adapter.MarkRollupProcessed(ctx, id))
+	//    the row was re-dirtied (claim token no longer matches).
+	marked, err := adapter.MarkRollupProcessed(ctx, id, items[0].ClaimedUntil)
+	require.NoError(t, err)
+	assert.False(t, marked, "re-dirtied claim must not be markable")
 
 	// 5. The row must still be pending — the enqueue was NOT lost.
 	pending, err := adapter.CountPendingRollups(ctx)
@@ -74,11 +76,65 @@ func TestRollupQueue_MarkProcessedSucceedsWithoutRedirty(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
-	require.NoError(t, adapter.MarkRollupProcessed(ctx, items[0].ID))
+	marked, err := adapter.MarkRollupProcessed(ctx, items[0].ID, items[0].ClaimedUntil)
+	require.NoError(t, err)
+	assert.True(t, marked, "valid claim must mark the row processed")
 
 	pending, err := adapter.CountPendingRollups(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), pending, "cleanly-processed row must be marked processed")
+}
+
+// TestRollupQueue_StaleWorkerCannotMarkOrReleaseReclaimedRow pins the claim-token
+// handshake. After a re-dirty lets a second worker re-claim the row, the first
+// (stale) worker must be able to neither mark it processed nor release/penalize
+// it — only the current owner can. Before the claim token, MarkRollupProcessed /
+// ReleaseRollupClaim only checked "some claim exists", letting a stale worker
+// clobber the live owner's claim (and, via release, falsely bump failed_attempts).
+func TestRollupQueue_StaleWorkerCannotMarkOrReleaseReclaimedRow(t *testing.T) {
+	pool := postgrestest.SetupDB(t)
+	ctx := context.Background()
+	adapter := postgres.NewRollupAdapter(pool)
+
+	const holder, currency, class = int64(400), int64(1), int64(40)
+
+	require.NoError(t, adapter.EnqueueRollup(ctx, holder, currency, class))
+
+	// Worker A claims with a 2-minute lease (tokenA).
+	adapter.SetClaimLease(2 * time.Minute)
+	itemsA, err := adapter.DequeueRollupBatch(ctx, 10)
+	require.NoError(t, err)
+	require.Len(t, itemsA, 1)
+	tokenA := itemsA[0].ClaimedUntil
+
+	// A journal re-dirties the claimed row (claimed_until → NULL).
+	require.NoError(t, adapter.EnqueueRollup(ctx, holder, currency, class))
+
+	// Worker B re-claims with a distinct 5-minute lease, so tokenB != tokenA.
+	adapter.SetClaimLease(5 * time.Minute)
+	itemsB, err := adapter.DequeueRollupBatch(ctx, 10)
+	require.NoError(t, err)
+	require.Len(t, itemsB, 1)
+	require.Equal(t, itemsA[0].ID, itemsB[0].ID, "same row must be re-claimed")
+	tokenB := itemsB[0].ClaimedUntil
+	require.False(t, tokenA.Equal(tokenB), "claim tokens must differ between owners")
+
+	// Stale worker A must NOT be able to mark B's row processed.
+	marked, err := adapter.MarkRollupProcessed(ctx, itemsA[0].ID, tokenA)
+	require.NoError(t, err)
+	assert.False(t, marked, "stale worker must not mark a row it no longer owns")
+
+	// Stale worker A's release must also no-op (must not clear B's claim).
+	require.NoError(t, adapter.ReleaseRollupClaim(ctx, itemsA[0].ID, tokenA))
+
+	// The current owner B can still finish its work.
+	marked, err = adapter.MarkRollupProcessed(ctx, itemsB[0].ID, tokenB)
+	require.NoError(t, err)
+	assert.True(t, marked, "current owner must still be able to mark its claim processed")
+
+	pending, err := adapter.CountPendingRollups(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), pending, "owner's mark must finalize the row")
 }
 
 // TestRollupQueue_CheckpointUpsertIsMonotonic pins the multi-worker safety guard:

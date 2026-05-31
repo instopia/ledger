@@ -134,7 +134,11 @@ func (c *countingRollupQueuer) DequeueRollupBatch(_ context.Context, _ int) ([]c
 	return nil, nil
 }
 
-func (c *countingRollupQueuer) MarkRollupProcessed(_ context.Context, _ int64) error { return nil }
-func (c *countingRollupQueuer) ReleaseRollupClaim(_ context.Context, _ int64) error  { return nil }
+func (c *countingRollupQueuer) MarkRollupProcessed(_ context.Context, _ int64, _ time.Time) (bool, error) {
+	return true, nil
+}
+func (c *countingRollupQueuer) ReleaseRollupClaim(_ context.Context, _ int64, _ time.Time) error {
+	return nil
+}
 func (c *countingRollupQueuer) CountPendingRollups(_ context.Context) (int64, error) { return 0, nil }
 func (c *countingRollupQueuer) EnqueueRollup(_ context.Context, _, _, _ int64) error { return nil }

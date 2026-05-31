@@ -76,6 +76,7 @@ func (a *RollupAdapter) DequeueRollupBatch(ctx context.Context, batchSize int) (
 			CurrencyID:       row.CurrencyID,
 			ClassificationID: row.ClassificationID,
 			CreatedAt:        row.CreatedAt,
+			ClaimedUntil:     row.ClaimedUntil.Time,
 		}
 		items = append(items, item)
 	}
@@ -83,15 +84,29 @@ func (a *RollupAdapter) DequeueRollupBatch(ctx context.Context, batchSize int) (
 	return items, nil
 }
 
-func (a *RollupAdapter) MarkRollupProcessed(ctx context.Context, id int64) error {
-	if err := a.q.MarkRollupProcessed(ctx, id); err != nil {
-		return fmt.Errorf("postgres: mark rollup processed: %w", err)
+// MarkRollupProcessed marks the item processed only if claimToken still matches
+// the row's claim (i.e. this worker still owns it). Returns false without error
+// when the claim was lost to a concurrent re-dirty or re-claim — the row stays
+// pending for its rightful owner.
+func (a *RollupAdapter) MarkRollupProcessed(ctx context.Context, id int64, claimToken time.Time) (bool, error) {
+	rows, err := a.q.MarkRollupProcessed(ctx, sqlcgen.MarkRollupProcessedParams{
+		ID:           id,
+		ClaimedUntil: timeToTimestamptz(claimToken),
+	})
+	if err != nil {
+		return false, fmt.Errorf("postgres: mark rollup processed: %w", err)
 	}
-	return nil
+	return rows > 0, nil
 }
 
-func (a *RollupAdapter) ReleaseRollupClaim(ctx context.Context, id int64) error {
-	if err := a.q.ReleaseRollupClaim(ctx, id); err != nil {
+// ReleaseRollupClaim releases the claim and bumps failed_attempts, but only if
+// claimToken still matches — a stale worker must not penalize work it no longer
+// owns.
+func (a *RollupAdapter) ReleaseRollupClaim(ctx context.Context, id int64, claimToken time.Time) error {
+	if err := a.q.ReleaseRollupClaim(ctx, sqlcgen.ReleaseRollupClaimParams{
+		ID:           id,
+		ClaimedUntil: timeToTimestamptz(claimToken),
+	}); err != nil {
 		return fmt.Errorf("postgres: release rollup claim: %w", err)
 	}
 	return nil

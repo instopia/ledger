@@ -33,12 +33,12 @@ func (m *mockRollupQueuer) DequeueRollupBatch(_ context.Context, batchSize int) 
 	return result, nil
 }
 
-func (m *mockRollupQueuer) MarkRollupProcessed(_ context.Context, id int64) error {
+func (m *mockRollupQueuer) MarkRollupProcessed(_ context.Context, id int64, _ time.Time) (bool, error) {
 	m.processed = append(m.processed, id)
-	return nil
+	return true, nil
 }
 
-func (m *mockRollupQueuer) ReleaseRollupClaim(_ context.Context, id int64) error {
+func (m *mockRollupQueuer) ReleaseRollupClaim(_ context.Context, id int64, _ time.Time) error {
 	m.released = append(m.released, id)
 	return nil
 }
