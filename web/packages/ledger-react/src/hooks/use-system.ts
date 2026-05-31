@@ -43,6 +43,7 @@ export function useSnapshots(params: {
   return useQuery({
     queryKey: ["ledger", "snapshots", params],
     queryFn: () => client.listSnapshots(params),
-    enabled: !!params.holder,
+    // Negative holders (system accounts) are valid; only 0/undefined disables.
+    enabled: params.holder !== undefined && params.holder !== 0,
   });
 }

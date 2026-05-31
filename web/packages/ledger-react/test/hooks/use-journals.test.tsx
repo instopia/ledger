@@ -102,4 +102,51 @@ describe("use-journals", () => {
     expect(keys).toContainEqual(["ledger", "journals"]);
     expect(keys).toContainEqual(["ledger", "balances"]);
   });
+
+  test("useJournals threads cursor through fetchNextPage and stops on empty next_cursor", async () => {
+    const qc = new QueryClient();
+    const seenCursors: (string | null)[] = [];
+    server.use(
+      http.get(`${BASE}/api/v1/journals`, ({ request }) => {
+        const cursor = new URL(request.url).searchParams.get("cursor");
+        seenCursors.push(cursor);
+        if (!cursor) {
+          // page 0
+          return HttpResponse.json({
+            code: 0,
+            message: "ok",
+            data: { data: [{ id: 1 }], next_cursor: "c1" },
+          });
+        }
+        // page 1 (cursor=c1) — last page, empty next_cursor stops pagination
+        return HttpResponse.json({
+          code: 0,
+          message: "ok",
+          data: { data: [{ id: 2 }], next_cursor: "" },
+        });
+      }),
+    );
+
+    const { result } = renderHook(() => useJournals(20), {
+      wrapper: wrapperWith(qc),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.pages).toHaveLength(1);
+    expect(result.current.hasNextPage).toBe(true);
+
+    await result.current.fetchNextPage();
+
+    await waitFor(() => expect(result.current.data?.pages).toHaveLength(2));
+    // Page 0 uses initialPageParam "" which the client's qs() drops (no
+    // cursor param → null); page 1 carries the cursor from page 0's next_cursor.
+    expect(seenCursors).toEqual([null, "c1"]);
+    // Both pages' data are present (appended, not replaced).
+    expect(result.current.data?.pages.flatMap((p) => p.data)).toEqual([
+      { id: 1 },
+      { id: 2 },
+    ]);
+    // next_cursor "" → getNextPageParam returns undefined → no more pages.
+    await waitFor(() => expect(result.current.hasNextPage).toBe(false));
+  });
 });

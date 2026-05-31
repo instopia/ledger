@@ -6,7 +6,9 @@ export function useBalances(holder: number) {
   return useQuery({
     queryKey: ["ledger", "balances", holder],
     queryFn: () => client.getBalances(holder),
-    enabled: holder > 0,
+    // Holder 0 means "no account"; any non-zero holder is valid — system
+    // counterparts are NEGATIVE holders, so don't gate on holder > 0.
+    enabled: holder !== 0,
     refetchInterval: 15_000,
   });
 }
@@ -16,7 +18,8 @@ export function useBalancesByCurrency(holder: number, currency: number) {
   return useQuery({
     queryKey: ["ledger", "balances", holder, currency],
     queryFn: () => client.getBalancesByCurrency(holder, currency),
-    enabled: holder > 0 && currency > 0,
+    // Negative holders (system accounts) are valid; only 0 means "no account".
+    enabled: holder !== 0 && currency > 0,
     refetchInterval: 15_000,
   });
 }

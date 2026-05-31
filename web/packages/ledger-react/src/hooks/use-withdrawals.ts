@@ -1,19 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLedgerClient } from "../provider/context";
 import { useLedgerMutation } from "./use-ledger-mutation";
+import { useClassificationIdByCode } from "./use-classification-id";
 import type { Booking } from "../client/types";
 
 const WITHDRAW_CODE = "withdraw";
-
-function useClassificationIdByCode(code: string): number {
-  const client = useLedgerClient();
-  const { data } = useQuery({
-    queryKey: ["ledger", "classifications", true],
-    queryFn: () => client.listClassifications(true),
-    staleTime: 5 * 60_000,
-  });
-  return data?.find((c) => c.code === code)?.id ?? 0;
-}
 
 export function useWithdrawClassificationId(): number {
   return useClassificationIdByCode(WITHDRAW_CODE);

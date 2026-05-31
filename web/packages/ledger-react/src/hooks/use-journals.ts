@@ -64,6 +64,8 @@ export function useEntries(
       client.listEntries({ ...params, cursor: pageParam, limit }),
     initialPageParam: "",
     getNextPageParam: (lastPage) => lastPage.next_cursor || undefined,
-    enabled: !!params.holder,
+    // Negative holders (system accounts) are valid; `!!holder` would wrongly
+    // disable holder 0 only — but be explicit so a negative holder runs too.
+    enabled: params.holder !== undefined && params.holder !== 0,
   });
 }
