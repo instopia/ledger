@@ -7,6 +7,16 @@ all-in-one `<LedgerAdmin/>` shell.
 
 ## Install
 
+This package is published to **GitHub Packages** under the `azex-ai` org, not
+the public npm registry. Add an `.npmrc` in your project so the `@azex` scope
+resolves there (you also need a GitHub token with `read:packages` set as
+`NODE_AUTH_TOKEN`, per the [GitHub Packages docs](https://docs.github.com/packages)):
+
+```
+# .npmrc
+@azex:registry=https://npm.pkg.github.com
+```
+
 ```bash
 npm install @azex/ledger-react @tanstack/react-query
 ```
@@ -98,6 +108,72 @@ the `./charts` subpath to keep `recharts` out of the root barrel. Import them
 import { DashboardPage, BalancesPage, BalanceTrend } from "@azex/ledger-react/charts";
 ```
 
+### Server prefetch (RSC) — import from `@azex/ledger-react/server`
+
+For React Server Components / Route Handlers, prefetch ledger data on the
+server and hydrate the client hooks with no client-side waterfall. The `/server`
+entry has **no `"use client"` directive** and is server-only:
+
+> **Never import `@azex/ledger-react/server` from a client component.**
+> `createServerLedgerClient` takes the server API key — keeping this entry off
+> the client barrel ensures the server key never reaches the client bundle.
+
+```tsx
+// app/journals/page.tsx (server component)
+import { QueryClient, HydrationBoundary, dehydrate } from "@tanstack/react-query";
+import { JournalsPage } from "@azex/ledger-react";
+import {
+  createServerLedgerClient,
+  prefetchJournals,
+} from "@azex/ledger-react/server";
+
+export default async function Page() {
+  const queryClient = new QueryClient();
+  const client = createServerLedgerClient({ baseUrl, apiKey }); // server-side key
+  await prefetchJournals(queryClient, client, 20);
+
+  return (
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <JournalsPage linkComponent={YourLink} />
+    </HydrationBoundary>
+  );
+}
+```
+
+Available `prefetch*` helpers: `prefetchJournals`, `prefetchEntries`,
+`prefetchBalances`, `prefetchSystemHealth`, `prefetchSystemBalances`,
+`prefetchReservations`, `prefetchClassifications`, `prefetchCurrencies`,
+`prefetchJournalTypes`, `prefetchTemplates`, `prefetchSnapshots`. The shared
+`ledgerKeys` query-key factory is also exported for advanced cache seeding.
+
+## Theming
+
+The Provider (and `<LedgerAdmin/>`) render a `<div className="ledger-root">`
+wrapper. All design tokens are scoped under `.ledger-root` (default **dark**;
+add `.light` for the light variant) so importing the stylesheet never leaks
+tokens into your host app. Re-theme by overriding the CSS custom properties:
+
+```css
+.ledger-root {
+  --primary: oklch(0.6 0.2 250);
+  --radius: 0.5rem;
+}
+```
+
+Or pass per-instance overrides inline via the provider `theme` prop (applied as
+inline style on the `.ledger-root` div):
+
+```tsx
+<LedgerProvider config={{ baseUrl, theme: { "--primary": "oklch(0.6 0.2 250)" } }}>
+```
+
+## Reference integration
+
+The `web/` app in [azex-ai/ledger](https://github.com/azex-ai/ledger) is the
+working reference integration — it consumes this package as its only ledger
+UI/data source (dogfood) and demonstrates both the client provider setup and
+the `/server` RSC prefetch pattern with a Next.js `linkComponent` adapter.
+
 ## Exports
 
 - **Root (`@azex/ledger-react`)** — `LedgerProvider`, `useLedgerClient`,
@@ -107,4 +183,7 @@ import { DashboardPage, BalancesPage, BalanceTrend } from "@azex/ledger-react/ch
   `LedgerAdmin`, and `Toaster`.
 - **`@azex/ledger-react/charts`** — `DashboardPage`, `BalancesPage`,
   `BalanceTrend` (recharts-backed).
+- **`@azex/ledger-react/server`** (server-only) — `createServerLedgerClient`,
+  the `prefetch*` helpers, and `ledgerKeys`. No `"use client"` directive; never
+  import from a client component.
 - **`@azex/ledger-react/styles.css`** — bundled Tailwind styles.

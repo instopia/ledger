@@ -1,0 +1,70 @@
+name: ledger-react-publish
+
+# Publishes @azex/ledger-react to GitHub Packages (azex-ai org) on a release
+# tag matching ledger-react-v* (e.g. ledger-react-v0.1.0). Whatever version is
+# in package.json at tag time is what gets published. Re-runs the full verify
+# gate first so a tag can never publish an artifact that doesn't pass CI.
+on:
+  push:
+    tags:
+      - 'ledger-react-v*'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run -w @azex/ledger-react typecheck
+      - run: npm run -w @azex/ledger-react test
+      - run: npm run -w @azex/ledger-react build
+      - name: Assert build artifacts
+        working-directory: web/packages/ledger-react
+        run: |
+          set -euo pipefail
+          first_index=$(head -n 1 dist/index.js)
+          if [ "$first_index" != '"use client";' ]; then
+            echo "::error::dist/index.js line 1 must be '\"use client\";' but was: $first_index"
+            exit 1
+          fi
+          if [ ! -s dist/styles.css ]; then
+            echo "::error::dist/styles.css is missing or empty"
+            exit 1
+          fi
+          if grep -q '"use client"' dist/server.js; then
+            echo "::error::dist/server.js must not contain a \"use client\" directive (server entry)"
+            exit 1
+          fi
+          echo "Build artifacts OK"
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@azex'
+      - run: npm ci
+      - run: npm run -w @azex/ledger-react build
+      - run: npm publish -w @azex/ledger-react
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

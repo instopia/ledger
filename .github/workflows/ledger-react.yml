@@ -1,0 +1,53 @@
+name: ledger-react
+
+# Build-test for the @azex/ledger-react package and its dogfood app (web/).
+# Path-filtered so Go-only changes never trigger this. Publishing lives in a
+# separate tag-driven workflow (ledger-react-publish.yml).
+on:
+  push:
+    paths:
+      - 'web/**'
+      - '.github/workflows/ledger-react.yml'
+  pull_request:
+    paths:
+      - 'web/**'
+      - '.github/workflows/ledger-react.yml'
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run -w @azex/ledger-react typecheck
+      - run: npm run -w @azex/ledger-react test
+      - run: npm run -w @azex/ledger-react build
+      - name: Assert build artifacts
+        working-directory: web/packages/ledger-react
+        run: |
+          set -euo pipefail
+          first_index=$(head -n 1 dist/index.js)
+          if [ "$first_index" != '"use client";' ]; then
+            echo "::error::dist/index.js line 1 must be '\"use client\";' but was: $first_index"
+            exit 1
+          fi
+          if [ ! -s dist/styles.css ]; then
+            echo "::error::dist/styles.css is missing or empty"
+            exit 1
+          fi
+          if grep -q '"use client"' dist/server.js; then
+            echo "::error::dist/server.js must not contain a \"use client\" directive (server entry)"
+            exit 1
+          fi
+          echo "Build artifacts OK"
+      # Dogfood guard: the app in web/ consumes the package; keep that green too.
+      - run: npm run build
+      - run: npm run lint
