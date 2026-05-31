@@ -3,7 +3,7 @@
  * conversion, plus ledger-specific display helpers that viem doesn't have.
  *
  * Consumer code should prefer viem-style usage:
- *   import { parseUnits, formatUnits } from "@/lib/utils";
+ *   import { parseUnits, formatUnits } from "@azex/ledger-react";
  *   const wei = parseUnits("1.5", 18);
  */
 
