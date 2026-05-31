@@ -13,6 +13,10 @@ on:
       - 'web/**'
       - '.github/workflows/ledger-react.yml'
 
+concurrency:
+  group: ledger-react-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-test:
     runs-on: ubuntu-latest

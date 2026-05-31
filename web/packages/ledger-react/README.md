@@ -15,6 +15,7 @@ resolves there (you also need a GitHub token with `read:packages` set as
 ```
 # .npmrc
 @azex:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
 ```
 
 ```bash
@@ -187,3 +188,21 @@ the `/server` RSC prefetch pattern with a Next.js `linkComponent` adapter.
   the `prefetch*` helpers, and `ledgerKeys`. No `"use client"` directive; never
   import from a client component.
 - **`@azex/ledger-react/styles.css`** — bundled Tailwind styles.
+
+## Releasing
+
+Publishing is tag-driven (CI workflow `ledger-react-publish.yml`). The tag
+version must match `package.json` — CI fails fast otherwise.
+
+1. Bump `version` in `web/packages/ledger-react/package.json`.
+2. Commit the bump.
+3. Tag and push:
+
+   ```bash
+   git tag ledger-react-v<version>   # e.g. ledger-react-v0.1.0
+   git push --tags
+   ```
+
+The workflow re-runs the full verify gate (typecheck, test, build, artifact
+assertions), asserts the tag matches `package.json`, then publishes to GitHub
+Packages.

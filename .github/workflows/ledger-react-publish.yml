@@ -65,6 +65,13 @@ jobs:
           scope: '@azex'
       - run: npm ci
       - run: npm run -w @azex/ledger-react build
+      - name: Assert tag matches package version
+        working-directory: web/packages/ledger-react
+        run: |
+          set -euo pipefail
+          pkg=$(node -p "require('./package.json').version")
+          tag="${GITHUB_REF_NAME#ledger-react-v}"
+          [ "$pkg" = "$tag" ] || { echo "::error::tag $tag != package.json version $pkg — bump version before tagging"; exit 1; }
       - run: npm publish -w @azex/ledger-react
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
