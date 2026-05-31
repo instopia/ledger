@@ -1,0 +1,20 @@
+{
+  "name": "@azex/ledger-react",
+  "version": "0.0.0",
+  "type": "module",
+  "sideEffects": ["*.css"],
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./server": { "types": "./dist/server.d.ts", "default": "./dist/server.js" },
+    "./styles.css": "./dist/styles.css"
+  },
+  "files": ["dist"],
+  "scripts": { "build": "tsup", "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "peerDependencies": { "react": "^19", "react-dom": "^19", "@tanstack/react-query": "^5" },
+  "devDependencies": {
+    "tsup": "^8", "vitest": "^2", "msw": "^2",
+    "@testing-library/react": "^16", "@testing-library/jest-dom": "^6",
+    "jsdom": "^25", "typescript": "^5"
+  },
+  "publishConfig": { "registry": "https://npm.pkg.github.com" }
+}
