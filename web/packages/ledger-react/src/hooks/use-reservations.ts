@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLedgerClient } from "../provider/context";
 import { useLedgerMutation } from "./use-ledger-mutation";
+import { ledgerKeys } from "./keys";
 
 export function useReservations(params: { holder?: number; status?: string }) {
   const client = useLedgerClient();
   return useQuery({
-    queryKey: ["ledger", "reservations", params],
+    queryKey: ledgerKeys.reservations(params),
     queryFn: () => client.listReservations(params),
   });
 }

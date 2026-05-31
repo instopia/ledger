@@ -1,10 +1,11 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLedgerClient } from "../provider/context";
+import { ledgerKeys } from "./keys";
 
 export function useHealth() {
   const client = useLedgerClient();
   return useQuery({
-    queryKey: ["ledger", "health"],
+    queryKey: ledgerKeys.health(),
     queryFn: () => client.getHealth(),
     refetchInterval: 10_000,
   });
@@ -13,7 +14,7 @@ export function useHealth() {
 export function useSystemBalances() {
   const client = useLedgerClient();
   return useQuery({
-    queryKey: ["ledger", "system-balances"],
+    queryKey: ledgerKeys.systemBalances(),
     queryFn: () => client.getSystemBalances(),
   });
 }
@@ -41,7 +42,7 @@ export function useSnapshots(params: {
 }) {
   const client = useLedgerClient();
   return useQuery({
-    queryKey: ["ledger", "snapshots", params],
+    queryKey: ledgerKeys.snapshots(params),
     queryFn: () => client.listSnapshots(params),
     // Negative holders (system accounts) are valid; only 0/undefined disables.
     enabled: params.holder !== undefined && params.holder !== 0,

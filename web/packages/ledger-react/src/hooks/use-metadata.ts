@@ -1,13 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLedgerClient } from "../provider/context";
 import type { LedgerClient } from "../client/client";
+import { ledgerKeys } from "./keys";
 
 // ─── Classifications ─────────────────────────────────────────────────
 
 export function useClassifications(activeOnly?: boolean) {
   const client = useLedgerClient();
   return useQuery({
-    queryKey: ["ledger", "classifications", activeOnly],
+    queryKey: ledgerKeys.classifications(activeOnly),
     queryFn: () => client.listClassifications(activeOnly),
   });
 }
@@ -38,7 +39,7 @@ export function useDeactivateClassification() {
 export function useJournalTypes(activeOnly?: boolean) {
   const client = useLedgerClient();
   return useQuery({
-    queryKey: ["ledger", "journal-types", activeOnly],
+    queryKey: ledgerKeys.journalTypes(activeOnly),
     queryFn: () => client.listJournalTypes(activeOnly),
   });
 }
@@ -69,7 +70,7 @@ export function useDeactivateJournalType() {
 export function useTemplates(activeOnly?: boolean) {
   const client = useLedgerClient();
   return useQuery({
-    queryKey: ["ledger", "templates", activeOnly],
+    queryKey: ledgerKeys.templates(activeOnly),
     queryFn: () => client.listTemplates(activeOnly),
   });
 }
@@ -117,7 +118,7 @@ export function usePreviewTemplate() {
 export function useCurrencies(activeOnly?: boolean) {
   const client = useLedgerClient();
   return useQuery({
-    queryKey: ["ledger", "currencies", activeOnly],
+    queryKey: ledgerKeys.currencies(activeOnly),
     queryFn: () => client.listCurrencies(activeOnly),
   });
 }

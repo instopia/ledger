@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLedgerClient } from "../provider/context";
+import { ledgerKeys } from "./keys";
 
 /**
  * Resolve the classification ID for a given code (e.g. "deposit", "withdraw").
@@ -11,7 +12,8 @@ import { useLedgerClient } from "../provider/context";
 export function useClassificationIdByCode(code: string): number {
   const client = useLedgerClient();
   const { data } = useQuery({
-    queryKey: ["ledger", "classifications", true],
+    // Shares the cache with useClassifications(true) — same key on purpose.
+    queryKey: ledgerKeys.classifications(true),
     queryFn: () => client.listClassifications(true),
     staleTime: 5 * 60_000,
   });

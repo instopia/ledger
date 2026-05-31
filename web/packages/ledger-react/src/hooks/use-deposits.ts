@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLedgerClient } from "../provider/context";
 import { useLedgerMutation } from "./use-ledger-mutation";
 import { useClassificationIdByCode } from "./use-classification-id";
+import { ledgerKeys } from "./keys";
 import type { Booking } from "../client/types";
 
 const DEPOSIT_CODE = "deposit";
@@ -14,7 +15,7 @@ export function useDeposits(params: { holder?: number; status?: string }) {
   const client = useLedgerClient();
   const classificationId = useDepositClassificationId();
   return useQuery<Booking[]>({
-    queryKey: ["ledger", "bookings", "deposit", { ...params, classificationId }],
+    queryKey: ledgerKeys.bookings(DEPOSIT_CODE, { ...params, classificationId }),
     queryFn: async () => {
       const page = await client.listBookings({
         holder: params.holder,

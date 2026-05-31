@@ -2,11 +2,12 @@ import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { useLedgerClient } from "../provider/context";
 import type { LedgerClient } from "../client/client";
 import { useLedgerMutation } from "./use-ledger-mutation";
+import { ledgerKeys } from "./keys";
 
 export function useJournals(limit = 20) {
   const client = useLedgerClient();
   return useInfiniteQuery({
-    queryKey: ["ledger", "journals", limit],
+    queryKey: ledgerKeys.journals(limit),
     queryFn: ({ pageParam }) =>
       client.listJournals({ cursor: pageParam, limit }),
     initialPageParam: "",
@@ -20,7 +21,7 @@ export function useJournal(id: number) {
     // Detail uses singular ["journal", id] so invalidation of the list
     // namespace ["ledger","journals"] (e.g. on reverse) doesn't force every
     // detail page to refetch.
-    queryKey: ["ledger", "journal", id],
+    queryKey: ledgerKeys.journal(id),
     queryFn: () => client.getJournal(id),
     enabled: id > 0,
   });
@@ -59,7 +60,7 @@ export function useEntries(
 ) {
   const client = useLedgerClient();
   return useInfiniteQuery({
-    queryKey: ["ledger", "entries", params],
+    queryKey: ledgerKeys.entries(params),
     queryFn: ({ pageParam }) =>
       client.listEntries({ ...params, cursor: pageParam, limit }),
     initialPageParam: "",
