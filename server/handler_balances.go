@@ -7,7 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
 
-	"github.com/azex-ai/ledger/pkg/httpx"
+	"github.com/instopia/ledger/pkg/httpx"
 )
 
 type balanceResponse struct {

@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
 
-	"github.com/azex-ai/ledger/core"
-	"github.com/azex-ai/ledger/postgres/sqlcgen"
+	"github.com/instopia/ledger/core"
+	"github.com/instopia/ledger/postgres/sqlcgen"
 )
 
 // --- pgtype <-> decimal ---

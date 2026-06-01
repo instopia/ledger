@@ -1,6 +1,6 @@
 package presets
 
-import "github.com/azex-ai/ledger/core"
+import "github.com/instopia/ledger/core"
 
 // WithdrawalLifecycle is a preset classification lifecycle for withdrawal operations.
 // States: locked -> reserved -> reviewing|processing -> confirmed | failed | expired

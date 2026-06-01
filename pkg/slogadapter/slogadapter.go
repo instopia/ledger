@@ -5,7 +5,7 @@ package slogadapter
 import (
 	"log/slog"
 
-	"github.com/azex-ai/ledger/core"
+	"github.com/instopia/ledger/core"
 )
 
 // New returns a core.Logger backed by the given *slog.Logger. If l is nil it

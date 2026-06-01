@@ -7,7 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/azex-ai/ledger/core"
+	"github.com/instopia/ledger/core"
 )
 
 func wrapStoreError(op string, err error) error {

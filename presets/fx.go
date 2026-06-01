@@ -3,7 +3,7 @@ package presets
 import (
 	"context"
 
-	"github.com/azex-ai/ledger/core"
+	"github.com/instopia/ledger/core"
 )
 
 // FX (foreign exchange) is a per-currency template pair, not a single

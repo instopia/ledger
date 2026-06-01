@@ -6,7 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/azex-ai/ledger/core"
+	"github.com/instopia/ledger/core"
 )
 
 // lockAcquirer abstracts pg_try_advisory_lock so tests can substitute a fake.

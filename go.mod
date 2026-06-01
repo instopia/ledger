@@ -1,4 +1,4 @@
-module github.com/azex-ai/ledger
+module github.com/instopia/ledger
 
 go 1.26.1
 
@@ -19,11 +19,11 @@ require (
 
 // Test-only deps. These ride along because internal/postgrestest is a separate
 // Go submodule (./internal/postgrestest) consumed only by *_test.go files in
-// this module. Library users importing github.com/azex-ai/ledger never
+// this module. Library users importing github.com/instopia/ledger never
 // actually compile against testcontainers/Docker SDK/etc.
-require github.com/azex-ai/ledger/internal/postgrestest v0.0.0-00010101000000-000000000000
+require github.com/instopia/ledger/internal/postgrestest v0.0.0-00010101000000-000000000000
 
-replace github.com/azex-ai/ledger/internal/postgrestest => ./internal/postgrestest
+replace github.com/instopia/ledger/internal/postgrestest => ./internal/postgrestest
 
 require (
 	dario.cat/mergo v1.0.2 // indirect

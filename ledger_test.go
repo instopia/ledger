@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/azex-ai/ledger"
+	"github.com/instopia/ledger"
 )
 
 // ---------------------------------------------------------------------------

@@ -26,10 +26,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
-	"github.com/azex-ai/ledger"
-	"github.com/azex-ai/ledger/core"
-	"github.com/azex-ai/ledger/postgres"
-	"github.com/azex-ai/ledger/service"
+	"github.com/instopia/ledger"
+	"github.com/instopia/ledger/core"
+	"github.com/instopia/ledger/postgres"
+	"github.com/instopia/ledger/service"
 )
 
 func main() {

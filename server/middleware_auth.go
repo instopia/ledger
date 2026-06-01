@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/azex-ai/ledger/pkg/bizcode"
-	"github.com/azex-ai/ledger/pkg/httpx"
+	"github.com/instopia/ledger/pkg/bizcode"
+	"github.com/instopia/ledger/pkg/httpx"
 )
 
 // authMiddleware enforces bearer-token API key auth on mutating requests.

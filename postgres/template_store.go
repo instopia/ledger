@@ -8,8 +8,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/azex-ai/ledger/core"
-	"github.com/azex-ai/ledger/postgres/sqlcgen"
+	"github.com/instopia/ledger/core"
+	"github.com/instopia/ledger/postgres/sqlcgen"
 )
 
 var _ core.TemplateStore = (*TemplateStore)(nil)

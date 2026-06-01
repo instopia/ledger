@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/azex-ai/ledger/channel"
+	"github.com/instopia/ledger/channel"
 	"github.com/shopspring/decimal"
 )
 

@@ -1,9 +1,9 @@
-module github.com/azex-ai/ledger/internal/postgrestest
+module github.com/instopia/ledger/internal/postgrestest
 
 go 1.26.1
 
 require (
-	github.com/azex-ai/ledger v0.0.0-00010101000000-000000000000
+	github.com/instopia/ledger v0.0.0-00010101000000-000000000000
 	github.com/jackc/pgx/v5 v5.5.4
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.42.0
@@ -70,4 +70,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/azex-ai/ledger => ../..
+replace github.com/instopia/ledger => ../..

@@ -8,8 +8,8 @@ import (
 	jsoniter "github.com/json-iterator/go"
 	"github.com/json-iterator/go/extra"
 
-	"github.com/azex-ai/ledger/core"
-	"github.com/azex-ai/ledger/pkg/bizcode"
+	"github.com/instopia/ledger/core"
+	"github.com/instopia/ledger/pkg/bizcode"
 )
 
 func init() {

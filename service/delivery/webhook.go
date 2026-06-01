@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/azex-ai/ledger/core"
+	"github.com/instopia/ledger/core"
 )
 
 // WebhookSubscriber represents a registered webhook endpoint.

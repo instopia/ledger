@@ -6,8 +6,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/azex-ai/ledger/core"
-	"github.com/azex-ai/ledger/pkg/httpx"
+	"github.com/instopia/ledger/core"
+	"github.com/instopia/ledger/pkg/httpx"
 )
 
 func (s *Server) handleWebhookCallback(w http.ResponseWriter, r *http.Request) {

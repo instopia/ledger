@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/azex-ai/ledger/core"
+	"github.com/instopia/ledger/core"
 )
 
 // CallbackDeliverer delivers events via synchronous function callbacks.

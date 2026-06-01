@@ -7,8 +7,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
-	"github.com/azex-ai/ledger/postgres/sqlcgen"
-	"github.com/azex-ai/ledger/service"
+	"github.com/instopia/ledger/postgres/sqlcgen"
+	"github.com/instopia/ledger/service"
 )
 
 // Compile-time assertion.

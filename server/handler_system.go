@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/azex-ai/ledger/pkg/httpx"
+	"github.com/instopia/ledger/pkg/httpx"
 )
 
 type healthResponse struct {

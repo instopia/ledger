@@ -7,8 +7,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
 
-	"github.com/azex-ai/ledger/core"
-	"github.com/azex-ai/ledger/pkg/httpx"
+	"github.com/instopia/ledger/core"
+	"github.com/instopia/ledger/pkg/httpx"
 )
 
 // --- Classification types ---

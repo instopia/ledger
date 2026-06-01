@@ -34,11 +34,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/azex-ai/ledger/channel"
-	"github.com/azex-ai/ledger/core"
-	"github.com/azex-ai/ledger/postgres"
-	"github.com/azex-ai/ledger/presets"
-	"github.com/azex-ai/ledger/service"
+	"github.com/instopia/ledger/channel"
+	"github.com/instopia/ledger/core"
+	"github.com/instopia/ledger/postgres"
+	"github.com/instopia/ledger/presets"
+	"github.com/instopia/ledger/service"
 )
 
 // Service bundles every store the ledger exposes as a library. Constructed

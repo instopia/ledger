@@ -7,8 +7,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/azex-ai/ledger/core"
-	"github.com/azex-ai/ledger/service/delivery"
+	"github.com/instopia/ledger/core"
+	"github.com/instopia/ledger/service/delivery"
 )
 
 // WorkerConfig holds configuration for the background Worker.

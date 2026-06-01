@@ -11,7 +11,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
-	ledgerotel "github.com/azex-ai/ledger/pkg/otel"
+	ledgerotel "github.com/instopia/ledger/pkg/otel"
 
 	otelglobal "go.opentelemetry.io/otel"
 )

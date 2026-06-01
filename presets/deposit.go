@@ -1,6 +1,6 @@
 package presets
 
-import "github.com/azex-ai/ledger/core"
+import "github.com/instopia/ledger/core"
 
 // DepositLifecycle is a preset classification lifecycle for deposit operations.
 // States: pending -> confirming -> confirmed | failed | expired

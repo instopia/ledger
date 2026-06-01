@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/azex-ai/ledger/core"
+	"github.com/instopia/ledger/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

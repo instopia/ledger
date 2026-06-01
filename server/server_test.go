@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/azex-ai/ledger/channel"
-	"github.com/azex-ai/ledger/core"
-	"github.com/azex-ai/ledger/server"
-	"github.com/azex-ai/ledger/service"
+	"github.com/instopia/ledger/channel"
+	"github.com/instopia/ledger/core"
+	"github.com/instopia/ledger/server"
+	"github.com/instopia/ledger/service"
 )
 
 // --- Mock implementations ---

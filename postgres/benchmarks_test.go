@@ -16,9 +16,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
-	"github.com/azex-ai/ledger/core"
-	"github.com/azex-ai/ledger/internal/postgrestest"
-	"github.com/azex-ai/ledger/postgres"
+	"github.com/instopia/ledger/core"
+	"github.com/instopia/ledger/internal/postgrestest"
+	"github.com/instopia/ledger/postgres"
 )
 
 // BenchmarkPostJournal_SingleAccount measures end-to-end PostJournal latency

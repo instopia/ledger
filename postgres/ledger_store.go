@@ -11,9 +11,9 @@ import (
 	"github.com/shopspring/decimal"
 	"go.opentelemetry.io/otel/attribute"
 
-	"github.com/azex-ai/ledger/core"
-	ledgerotel "github.com/azex-ai/ledger/pkg/otel"
-	"github.com/azex-ai/ledger/postgres/sqlcgen"
+	"github.com/instopia/ledger/core"
+	ledgerotel "github.com/instopia/ledger/pkg/otel"
+	"github.com/instopia/ledger/postgres/sqlcgen"
 )
 
 // Compile-time check: *pgxpool.Pool satisfies DBTX.

@@ -1,6 +1,6 @@
 // Example: minimum-viable embed.
 //
-// The shortest path from `import "github.com/azex-ai/ledger"` to a posted
+// The shortest path from `import "github.com/instopia/ledger"` to a posted
 // journal and a queried balance — with no template, no booking, no preset
 // installation. Useful as the "hello world" to compare your integration
 // against, and as a documentation aid for the dual-mode story (library +
@@ -32,9 +32,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
-	"github.com/azex-ai/ledger"
-	"github.com/azex-ai/ledger/core"
-	"github.com/azex-ai/ledger/postgres"
+	"github.com/instopia/ledger"
+	"github.com/instopia/ledger/core"
+	"github.com/instopia/ledger/postgres"
 )
 
 const userID int64 = 9001

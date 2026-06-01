@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/azex-ai/ledger/core"
-	"github.com/azex-ai/ledger/internal/postgrestest"
-	"github.com/azex-ai/ledger/postgres"
+	"github.com/instopia/ledger/core"
+	"github.com/instopia/ledger/internal/postgrestest"
+	"github.com/instopia/ledger/postgres"
 )
 
 // TestRollupQueue_ReDirtyPreventsLostEnqueue pins the DB-level closure of the

@@ -6,8 +6,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/azex-ai/ledger/postgres/sqlcgen"
-	"github.com/azex-ai/ledger/service/delivery"
+	"github.com/instopia/ledger/postgres/sqlcgen"
+	"github.com/instopia/ledger/service/delivery"
 )
 
 var _ delivery.SubscriberLister = (*WebhookSubscriberStore)(nil)

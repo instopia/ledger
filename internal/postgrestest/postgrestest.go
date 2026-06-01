@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 
-	ledgerpg "github.com/azex-ai/ledger/postgres"
+	ledgerpg "github.com/instopia/ledger/postgres"
 )
 
 // SetupDB starts a PostgreSQL container, runs ledger migrations, and returns

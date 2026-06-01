@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	ledger "github.com/azex-ai/ledger"
-	"github.com/azex-ai/ledger/core"
-	"github.com/azex-ai/ledger/internal/postgrestest"
-	"github.com/azex-ai/ledger/postgres"
+	ledger "github.com/instopia/ledger"
+	"github.com/instopia/ledger/core"
+	"github.com/instopia/ledger/internal/postgrestest"
+	"github.com/instopia/ledger/postgres"
 )
 
 // TestTxComposition_Rollback verifies that a journal posted via a LedgerStore

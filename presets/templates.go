@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/azex-ai/ledger/core"
+	"github.com/instopia/ledger/core"
 )
 
 type ClassificationPreset struct {

@@ -10,8 +10,8 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"github.com/azex-ai/ledger/pkg/bizcode"
-	"github.com/azex-ai/ledger/pkg/httpx"
+	"github.com/instopia/ledger/pkg/bizcode"
+	"github.com/instopia/ledger/pkg/httpx"
 )
 
 // rateLimiterConfig configures per-IP rate limits. mutationPerMin applies to

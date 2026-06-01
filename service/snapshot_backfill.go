@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/azex-ai/ledger/core"
+	"github.com/instopia/ledger/core"
 )
 
 // BalanceLister returns all account balances computed from journal entries

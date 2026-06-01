@@ -11,9 +11,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/azex-ai/ledger/channel"
-	"github.com/azex-ai/ledger/core"
-	"github.com/azex-ai/ledger/service"
+	"github.com/instopia/ledger/channel"
+	"github.com/instopia/ledger/core"
+	"github.com/instopia/ledger/service"
 )
 
 // Server is the HTTP API server for the ledger.

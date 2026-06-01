@@ -3,7 +3,7 @@ package presets
 import (
 	"context"
 
-	"github.com/azex-ai/ledger/core"
+	"github.com/instopia/ledger/core"
 )
 
 // spreadClassifications introduces the spread system revenue account.

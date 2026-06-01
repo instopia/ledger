@@ -16,7 +16,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const tracerName = "github.com/azex-ai/ledger"
+const tracerName = "github.com/instopia/ledger"
 
 // StartSpan starts a new span with the given name and optional attributes.
 // The caller must end the span when done:

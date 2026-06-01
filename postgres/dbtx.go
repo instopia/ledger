@@ -5,7 +5,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/azex-ai/ledger/postgres/sqlcgen"
+	"github.com/instopia/ledger/postgres/sqlcgen"
 )
 
 // DBTX is the minimal database executor accepted by all postgres stores. Both

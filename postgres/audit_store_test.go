@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/azex-ai/ledger/core"
-	"github.com/azex-ai/ledger/internal/postgrestest"
-	"github.com/azex-ai/ledger/postgres"
-	"github.com/azex-ai/ledger/presets"
+	"github.com/instopia/ledger/core"
+	"github.com/instopia/ledger/internal/postgrestest"
+	"github.com/instopia/ledger/postgres"
+	"github.com/instopia/ledger/presets"
 )
 
 // seedAuditFixture creates two journals touching the same account, plus a
