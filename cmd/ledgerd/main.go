@@ -15,15 +15,15 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/azex-ai/ledger"
-	chanOnchain "github.com/azex-ai/ledger/channel/onchain"
-	"github.com/azex-ai/ledger/core"
-	"github.com/azex-ai/ledger/observability"
-	"github.com/azex-ai/ledger/pkg/slogadapter"
-	"github.com/azex-ai/ledger/postgres"
-	"github.com/azex-ai/ledger/server"
-	"github.com/azex-ai/ledger/service"
-	"github.com/azex-ai/ledger/service/delivery"
+	"github.com/instopia/ledger"
+	chanOnchain "github.com/instopia/ledger/channel/onchain"
+	"github.com/instopia/ledger/core"
+	"github.com/instopia/ledger/observability"
+	"github.com/instopia/ledger/pkg/slogadapter"
+	"github.com/instopia/ledger/postgres"
+	"github.com/instopia/ledger/server"
+	"github.com/instopia/ledger/service"
+	"github.com/instopia/ledger/service/delivery"
 )
 
 func main() {
