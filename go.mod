@@ -17,13 +17,28 @@ require (
 	golang.org/x/time v0.15.0
 )
 
-// Test-only deps. These ride along because internal/postgrestest is a separate
-// Go submodule (./internal/postgrestest) consumed only by *_test.go files in
-// this module. Library users importing github.com/instopia/ledger never
-// actually compile against testcontainers/Docker SDK/etc.
-require github.com/instopia/ledger/internal/postgrestest v0.0.0-00010101000000-000000000000
-
-replace github.com/instopia/ledger/internal/postgrestest => ./internal/postgrestest
+// internal/postgrestest is a separate Go submodule (./internal/postgrestest),
+// imported only by *_test.go files in this module, so that library users never
+// compile against testcontainers / the Docker SDK.
+//
+// It is DELIBERATELY not required here. It used to be, paired with a replace
+// directive:
+//
+//	require github.com/instopia/ledger/internal/postgrestest v0.0.0-000…
+//	replace github.com/instopia/ledger/internal/postgrestest => ./internal/postgrestest
+//
+// which works locally and breaks every CONSUMER. Replace directives are
+// ignored outside the main module, so anyone depending on this module saw the
+// require with an unresolvable zero pseudo-version, and `go mod tidy` — which
+// walks the test dependencies of dependencies — failed with:
+//
+//	internal/postgrestest@v0.0.0-00010101000000-000000000000:
+//	invalid version: unknown revision 000000000000
+//
+// go.work at the repo root already wires both modules together, which is what
+// makes `go test ./...` work here without the require. That is the mechanism
+// go.work exists for; the require/replace pair was doing the same job in the
+// one place it leaks.
 
 require (
 	dario.cat/mergo v1.0.2 // indirect
