@@ -57,6 +57,9 @@ type AddPendingInput struct {
 }
 
 func (i AddPendingInput) Validate() error {
+	if err := ValidateAmountMagnitude(i.Amount); err != nil {
+		return fmt.Errorf("pending: add: %w", err)
+	}
 	if i.AccountHolder == 0 {
 		return fmt.Errorf("pending: add: account_holder required: %w", ErrInvalidInput)
 	}
@@ -84,6 +87,9 @@ type ConfirmPendingInput struct {
 }
 
 func (i ConfirmPendingInput) Validate() error {
+	if err := ValidateAmountMagnitude(i.Amount); err != nil {
+		return fmt.Errorf("pending: confirm: %w", err)
+	}
 	if i.AccountHolder == 0 {
 		return fmt.Errorf("pending: confirm: account_holder required: %w", ErrInvalidInput)
 	}
@@ -112,6 +118,9 @@ type CancelPendingInput struct {
 }
 
 func (i CancelPendingInput) Validate() error {
+	if err := ValidateAmountMagnitude(i.Amount); err != nil {
+		return fmt.Errorf("pending: cancel: %w", err)
+	}
 	if i.AccountHolder == 0 {
 		return fmt.Errorf("pending: cancel: account_holder required: %w", ErrInvalidInput)
 	}

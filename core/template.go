@@ -129,6 +129,9 @@ func (t *EntryTemplate) Render(params TemplateParams) (*JournalInput, error) {
 		if !ok {
 			return nil, fmt.Errorf("core: template: line[%d]: missing amount key %q: %w", i, line.AmountKey, ErrInvalidInput)
 		}
+		if err := ValidateAmountMagnitude(amount); err != nil {
+			return nil, fmt.Errorf("core: template: line[%d]: amount %q: %w", i, line.AmountKey, err)
+		}
 
 		var holder int64
 		switch line.HolderRole {

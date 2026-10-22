@@ -62,6 +62,10 @@ func (s *ReserverStore) WithDB(db DBTX, ledger *LedgerStore) *ReserverStore {
 // In tx mode (bound via withDB) the reservation is written into the caller's
 // transaction; commit/rollback is the caller's responsibility.
 func (s *ReserverStore) Reserve(ctx context.Context, input core.ReserveInput) (*core.Reservation, error) {
+	// Validate before the span renders the amount.
+	if err := input.Validate(); err != nil {
+		return nil, fmt.Errorf("postgres: reserve: %w", err)
+	}
 	ctx, span := ledgerotel.StartSpan(ctx, "ledger.reserver.reserve",
 		attribute.Int64("account_holder", input.AccountHolder),
 		attribute.Int64("currency_id", input.CurrencyID),
@@ -216,6 +220,10 @@ func resolveReservationExpiresIn(d time.Duration) time.Duration {
 // In tx mode (bound via withDB) the update is applied to the caller's
 // transaction; commit/rollback is the caller's responsibility.
 func (s *ReserverStore) Settle(ctx context.Context, reservationID int64, actualAmount decimal.Decimal) error {
+	// Before anything renders the amount (the span attribute below does).
+	if err := core.ValidateAmountMagnitude(actualAmount); err != nil {
+		return fmt.Errorf("postgres: settle: %w", err)
+	}
 	ctx, span := ledgerotel.StartSpan(ctx, "ledger.reserver.settle",
 		attribute.Int64("reservation_id", reservationID),
 		attribute.String("actual_amount", actualAmount.String()),

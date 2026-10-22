@@ -44,6 +44,9 @@ type CreateBookingInput struct {
 }
 
 func (i CreateBookingInput) Validate() error {
+	if err := ValidateAmountMagnitude(i.Amount); err != nil {
+		return fmt.Errorf("core: booking: %w", err)
+	}
 	if i.ClassificationCode == "" {
 		return fmt.Errorf("core: booking: classification_code required: %w", ErrInvalidInput)
 	}
@@ -75,6 +78,9 @@ type TransitionInput struct {
 }
 
 func (i TransitionInput) Validate() error {
+	if err := ValidateAmountMagnitude(i.Amount); err != nil {
+		return fmt.Errorf("core: booking: transition: %w", err)
+	}
 	if i.BookingID <= 0 {
 		return fmt.Errorf("core: booking: booking_id must be positive: %w", ErrInvalidInput)
 	}

@@ -56,6 +56,11 @@ func (s *BookingStore) WithDB(db DBTX) *BookingStore {
 // Idempotent: same key + same payload returns the existing booking; divergent
 // payload returns ErrConflict.
 func (s *BookingStore) CreateBooking(ctx context.Context, input core.CreateBookingInput) (*core.Booking, error) {
+	// Validate before the span renders the amount (an unstorable amount
+	// costs unbounded CPU to render).
+	if err := input.Validate(); err != nil {
+		return nil, fmt.Errorf("postgres: create booking: %w", err)
+	}
 	ctx, span := ledgerotel.StartSpan(ctx, "ledger.booking.create_booking",
 		attribute.String("classification_code", input.ClassificationCode),
 		attribute.Int64("account_holder", input.AccountHolder),

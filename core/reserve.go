@@ -61,6 +61,9 @@ type ReserveInput struct {
 }
 
 func (i ReserveInput) Validate() error {
+	if err := ValidateAmountMagnitude(i.Amount); err != nil {
+		return fmt.Errorf("core: reserve: %w", err)
+	}
 	if i.AccountHolder == 0 {
 		return fmt.Errorf("core: reserve: account_holder required: %w", ErrInvalidInput)
 	}
