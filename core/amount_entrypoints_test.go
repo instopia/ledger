@@ -21,7 +21,7 @@ func TestEveryAmountEntryPointRejectsAnUnstorableAmount(t *testing.T) {
 			t.Errorf("%q parsed as a decimal", s)
 		}
 	}
-	bad := []string{"1E999999999", "1E-999999999", "1000000000000", "0.0000000000000000001"}
+	bad := []string{"1E999999999", "1E-999999999", "0E999999999", "0E-999999999", "1000000000000", "0.0000000000000000001"}
 	type entry struct {
 		name string
 		run  func(a decimal.Decimal) error

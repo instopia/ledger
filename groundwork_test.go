@@ -328,6 +328,15 @@ func TestGroundwork(t *testing.T) {
 		_ = j
 	})
 
+	t.Run("Settle bounds its amount before anything renders it", func(t *testing.T) {
+		for _, a := range []string{"0E999999999", "0E-999999999", "1E999999999", "-1"} {
+			start := time.Now()
+			err := svc.Reserver().Settle(ctx, 1, d(a))
+			require.ErrorIs(t, err, core.ErrInvalidInput, "settle %s", a)
+			assert.Less(t, time.Since(start), 100*time.Millisecond, "settle %s", a)
+		}
+	})
+
 	t.Run("INSERT guards: no appended entries, no back-dating", func(t *testing.T) {
 		j := post(t, pay("ins-host", 7701, 7702, "2"))
 		_, err := pool.Exec(ctx, `INSERT INTO journal_entries (journal_id, account_holder, currency_id, classification_id, entry_type, amount)

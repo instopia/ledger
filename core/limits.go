@@ -11,6 +11,10 @@ import (
 const (
 	MaxAmountIntegerDigits    = 12
 	MaxAmountFractionalDigits = 18
+
+	// maxAmountExponentMagnitude bounds a negative exponent (trailing
+	// fractional zeros, e.g. "1.000…0") before anything rescales it.
+	maxAmountExponentMagnitude = 1000
 )
 
 // ValidateAmountMagnitude refuses an amount the storage column could not hold.
@@ -30,13 +34,17 @@ func ValidateAmountMagnitude(d decimal.Decimal) error {
 	if coeff.Sign() < 0 {
 		digits-- // the minus sign is not a digit
 	}
+	// The exponent is bounded FIRST, zero included: "0E999999999" is still a
+	// billion digits to anything that renders or rescales it.
+	if exp < -maxAmountExponentMagnitude || exp > MaxAmountIntegerDigits {
+		return fmt.Errorf("core: amount exponent %d is out of range: %w", exp, ErrInvalidInput)
+	}
 	if coeff.Sign() == 0 {
 		return nil
 	}
 	if exp < -MaxAmountFractionalDigits {
 		// More fractional digits than storable, unless they are trailing zeros.
-		// (Truncate rescales the coefficient, so bound the exponent first.)
-		if exp < -1000 || !d.Truncate(MaxAmountFractionalDigits).Equal(d) {
+		if !d.Truncate(MaxAmountFractionalDigits).Equal(d) {
 			return fmt.Errorf("core: amount has more than %d fractional digits: %w", MaxAmountFractionalDigits, ErrInvalidInput)
 		}
 	}

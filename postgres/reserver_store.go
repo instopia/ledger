@@ -224,6 +224,9 @@ func (s *ReserverStore) Settle(ctx context.Context, reservationID int64, actualA
 	if err := core.ValidateAmountMagnitude(actualAmount); err != nil {
 		return fmt.Errorf("postgres: settle: %w", err)
 	}
+	if actualAmount.IsNegative() {
+		return fmt.Errorf("postgres: settle: actual amount must not be negative: %w", core.ErrInvalidInput)
+	}
 	ctx, span := ledgerotel.StartSpan(ctx, "ledger.reserver.settle",
 		attribute.Int64("reservation_id", reservationID),
 		attribute.String("actual_amount", actualAmount.String()),
