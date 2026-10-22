@@ -66,7 +66,11 @@ docker compose up --build
 ## Workflow: Adding Features
 
 ```
-1. SQL migration in postgres/sql/migrations/
+1. SQL migration in postgres/sql/migrations/ (on a large existing table, add a
+   CHECK or FK as `ADD CONSTRAINT ... NOT VALID` and `VALIDATE CONSTRAINT` in a
+   separate statement: the plain form holds ACCESS EXCLUSIVE while it scans
+   every row; consumers that copy migrations, e.g. Instopia's tenant
+   migrations, copy them verbatim)
 2. Queries in postgres/sql/queries/*.sql -> cd postgres && sqlc generate
 3. Domain types/logic in core/
 4. Store adapter in postgres/

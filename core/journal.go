@@ -59,6 +59,10 @@ type JournalInput struct {
 	// entries are written, under the balance locks the post already holds.
 	// A breach fails the post with *NegativeBalanceError. Not stored: an
 	// idempotent replay moves no money, so it is not re-checked.
+	//
+	// The check runs AFTER the journal's rows are inserted, with no
+	// savepoint: inside a caller's transaction (RunInTx / WithTx) a refusal
+	// means that transaction must roll back, never commit.
 	RequireNonNegative []BalanceKey `json:"require_non_negative,omitempty"`
 }
 

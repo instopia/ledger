@@ -22,10 +22,14 @@ type BalanceFilter struct {
 	// ClassificationIDs limits the result to these classifications; empty
 	// means every classification.
 	ClassificationIDs []int64 `json:"classification_ids"`
-	// Before, when non-zero, counts only the entries created strictly before
-	// it: the position as it stood at that instant. Entries are append-only
-	// and stamped with their transaction's time, so a past position never
-	// changes once that instant has passed.
+	// Before, when non-zero, counts only the entries whose created_at is
+	// strictly before it. created_at is the posting transaction's START time
+	// (now()), not its commit time: a transaction that began before Before
+	// and commits after it adds entries "before" an instant that was already
+	// read, so a past position can still change until every transaction
+	// that started before it has finished. Entries are append-only and can't
+	// be back-dated (migration 022), but this is not a closed-period
+	// guarantee; period close is a separate, future mechanism.
 	Before time.Time `json:"before"`
 }
 

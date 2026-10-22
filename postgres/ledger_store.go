@@ -135,6 +135,12 @@ func (s *LedgerStore) WithDB(db DBTX) *LedgerStore {
 // In pool mode a new transaction is started and committed here.
 // In tx mode (store bound via withDB) the journal is written directly into
 // the caller's transaction; commit/rollback is the caller's responsibility.
+//
+// In tx mode an ERROR MEANS THE CALLER'S TRANSACTION MUST ROLL BACK. Some
+// checks (the per-currency balance check, RequireNonNegative, the event
+// link) run after the journal and entry rows are inserted, and there is no
+// savepoint: a caller that swallows the error and commits would commit a
+// refused journal. (RunInTx rolls back on any error the callback returns.)
 func (s *LedgerStore) PostJournal(ctx context.Context, input core.JournalInput) (*core.Journal, error) {
 	ctx, span := ledgerotel.StartSpan(ctx, "ledger.ledger.post_journal",
 		attribute.String("idempotency_key", input.IdempotencyKey),
