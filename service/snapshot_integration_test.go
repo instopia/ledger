@@ -94,27 +94,37 @@ func seedJournal(
 ) int64 {
 	t.Helper()
 	ctx := context.Background()
+	// Seeding HISTORY: migration 022 stamps every journal and entry with
+	// its transaction's time, so a back-dated seed runs with the triggers
+	// off for its own transaction (the test role is a superuser).
+	tx, err := pgpool.Begin(ctx)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback(ctx) }()
+	_, err = tx.Exec(ctx, `SET LOCAL session_replication_role = replica`)
+	require.NoError(t, err)
+
 	var jID int64
-	err := pgpool.QueryRow(ctx,
+	err = tx.QueryRow(ctx,
 		`INSERT INTO journals (journal_type_id, idempotency_key, total_debit, total_credit, actor_id, source, event_id, created_at)
 		 VALUES ($1, $2, $3, $3, 0, 'test', 0, $4) RETURNING id`,
 		jtID, ikey, amount.String(), at,
 	).Scan(&jID)
 	require.NoError(t, err)
 
-	_, err = pgpool.Exec(ctx,
+	_, err = tx.Exec(ctx,
 		`INSERT INTO journal_entries (journal_id, account_holder, currency_id, classification_id, entry_type, amount, created_at)
 		 VALUES ($1,$2,$3,$4,'debit',$5,$6)`,
 		jID, holderID, currencyID, classID, amount.String(), at,
 	)
 	require.NoError(t, err)
 
-	_, err = pgpool.Exec(ctx,
+	_, err = tx.Exec(ctx,
 		`INSERT INTO journal_entries (journal_id, account_holder, currency_id, classification_id, entry_type, amount, created_at)
 		 VALUES ($1,$2,$3,$4,'credit',$5,$6)`,
 		jID, -holderID, currencyID, sysClassID, amount.String(), at,
 	)
 	require.NoError(t, err)
+	require.NoError(t, tx.Commit(ctx))
 
 	return jID
 }

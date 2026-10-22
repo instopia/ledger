@@ -1,0 +1,10 @@
+DROP TRIGGER IF EXISTS journal_entries_default_no_truncate ON journal_entries_default;
+DROP TRIGGER IF EXISTS journal_entries_no_truncate ON journal_entries;
+DROP TRIGGER IF EXISTS journals_no_truncate ON journals;
+DROP FUNCTION IF EXISTS ledger_block_truncate();
+DROP TRIGGER IF EXISTS journal_entries_guard_insert ON journal_entries;
+DROP FUNCTION IF EXISTS ledger_journal_entries_guard_insert();
+DROP TRIGGER IF EXISTS journals_guard_insert ON journals;
+DROP FUNCTION IF EXISTS ledger_journals_guard_insert();
+ALTER TABLE journals DROP CONSTRAINT IF EXISTS chk_journals_totals_not_nan;
+ALTER TABLE journal_entries DROP CONSTRAINT IF EXISTS chk_journal_entries_amount_not_nan;
