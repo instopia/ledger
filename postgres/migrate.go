@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"io/fs"
 	"strings"
 	"time"
 
@@ -15,6 +16,18 @@ import (
 
 //go:embed sql/migrations/*.sql
 var migrations embed.FS
+
+// Migrations returns the schema migrations (golang-migrate files,
+// NNN_name.up.sql / .down.sql) as embedded in this build. A consumer that
+// provisions the schema its own way (e.g. inside its own migration
+// sequence) can read them to stay byte-identical with the engine.
+func Migrations() fs.FS {
+	sub, err := fs.Sub(migrations, "sql/migrations")
+	if err != nil {
+		panic(err) // the embedded path is a compile-time constant
+	}
+	return sub
+}
 
 // Migrate runs all pending schema migrations against the given database URL.
 // The URL should use the pgx5 scheme, e.g. "pgx5://user:pass@host/db".

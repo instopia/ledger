@@ -24,6 +24,7 @@ var (
 	_ core.JournalWriter         = (*LedgerStore)(nil)
 	_ core.TemplateBatchExecutor = (*LedgerStore)(nil)
 	_ core.BalanceReader         = (*LedgerStore)(nil)
+	_ core.JournalReverser       = (*LedgerStore)(nil)
 )
 
 // LedgerStore implements JournalWriter and BalanceReader using PostgreSQL.
@@ -247,8 +248,23 @@ func (s *LedgerStore) executeTemplateBatchWithQueries(ctx context.Context, q *sq
 	return journals, nil
 }
 
-// ReverseJournal creates a reversal journal for the given journal ID.
+// ReverseJournal creates a reversal journal for the given journal ID, keyed
+// "reversal:<journal_id>:<reason>".
 func (s *LedgerStore) ReverseJournal(ctx context.Context, journalID int64, reason string) (*core.Journal, error) {
+	return s.ReverseJournalWith(ctx, core.ReverseInput{JournalID: journalID, Reason: reason})
+}
+
+// ReverseJournalWith posts a full reversal of in.JournalID: the original's
+// entries, every side flipped, linked by reversal_of. A journal is reversed
+// at most once and a reversal is never itself reversed (ErrConflict).
+// Idempotent on the reversal's key: a retry with the same key returns the
+// existing reversal. In tx mode it runs inside the caller's transaction like
+// PostJournal.
+func (s *LedgerStore) ReverseJournalWith(ctx context.Context, in core.ReverseInput) (*core.Journal, error) {
+	if err := in.Validate(); err != nil {
+		return nil, fmt.Errorf("postgres: reverse journal: %w", err)
+	}
+	journalID := in.JournalID
 	original, err := s.q.GetJournal(ctx, journalID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -260,11 +276,14 @@ func (s *LedgerStore) ReverseJournal(ctx context.Context, journalID int64, reaso
 		return nil, fmt.Errorf("postgres: reverse journal: journal %d is already a reversal: %w", journalID, core.ErrConflict)
 	}
 
-	expectedKey := fmt.Sprintf("reversal:%d:%s", journalID, reason)
+	expectedKey := in.IdempotencyKey
+	if expectedKey == "" {
+		expectedKey = fmt.Sprintf("reversal:%d:%s", journalID, in.Reason)
+	}
 	existingReversal, err := s.q.GetReversalByOriginalJournalID(ctx, int64ToInt8(&journalID))
 	if err == nil {
-		// Same (journalID, reason) → idempotent retry, return the original reversal.
-		// Different reason → genuine conflict (a reversal already exists for this journal).
+		// Same key → idempotent retry, return the original reversal.
+		// Different key → genuine conflict (a reversal already exists for this journal).
 		if existingReversal.IdempotencyKey == expectedKey {
 			return journalFromRow(existingReversal), nil
 		}
@@ -286,25 +305,95 @@ func (s *LedgerStore) ReverseJournal(ctx context.Context, journalID int64, reaso
 		if core.EntryType(e.EntryType) == core.EntryTypeDebit {
 			entryType = core.EntryTypeCredit
 		}
+		amount, err := numericToDecimal(e.Amount)
+		if err != nil {
+			return nil, fmt.Errorf("postgres: reverse journal: entry %v: %w", e.ID, err)
+		}
 		reversedEntries[i] = core.EntryInput{
 			AccountHolder:    e.AccountHolder,
 			CurrencyID:       e.CurrencyID,
 			ClassificationID: e.ClassificationID,
 			EntryType:        entryType,
-			Amount:           mustNumericToDecimal(e.Amount),
+			Amount:           amount,
 		}
 	}
 
+	source := in.Source
+	if source == "" {
+		source = "reversal"
+	}
+	metadata := make(map[string]string, len(in.Metadata)+1)
+	for k, v := range in.Metadata {
+		metadata[k] = v
+	}
+	if in.Reason != "" {
+		metadata["reason"] = in.Reason
+	}
+
 	input := core.JournalInput{
-		JournalTypeID:  original.JournalTypeID,
-		IdempotencyKey: expectedKey,
-		Entries:        reversedEntries,
-		Source:         "reversal",
-		ReversalOf:     journalID,
-		Metadata:       map[string]string{"reason": reason},
+		JournalTypeID:      original.JournalTypeID,
+		IdempotencyKey:     expectedKey,
+		Entries:            reversedEntries,
+		Source:             source,
+		ActorID:            in.ActorID,
+		ReversalOf:         journalID,
+		Metadata:           metadata,
+		RequireNonNegative: in.RequireNonNegative,
 	}
 
 	return s.PostJournal(ctx, input)
+}
+
+// LockBalances takes the balance lock PostJournal takes for every
+// (holder, currencyID) pair, in PostJournal's order, on the bound
+// transaction. A balance read after LockBalances cannot change until the
+// transaction ends, so a caller can read, decide, then post (re-locking a
+// held lock is a no-op). Only valid on a store bound to a transaction:
+// otherwise core.ErrOutsideTransaction.
+func (s *LedgerStore) LockBalances(ctx context.Context, currencyID int64, holders ...int64) error {
+	if _, ok := s.db.(pgx.Tx); !ok {
+		return fmt.Errorf("postgres: lock balances: %w", core.ErrOutsideTransaction)
+	}
+	entries := make([]core.EntryInput, len(holders))
+	for i, h := range holders {
+		entries[i] = core.EntryInput{AccountHolder: h, CurrencyID: currencyID}
+	}
+	return acquireBalanceLocks(ctx, s.q, balancePairsFromEntries(entries))
+}
+
+// checkNonNegative enforces JournalInput.RequireNonNegative after the
+// journal's entries are written (the balance locks are held).
+func (s *LedgerStore) checkNonNegative(ctx context.Context, q *sqlcgen.Queries, input core.JournalInput) error {
+	for _, k := range input.RequireNonNegative {
+		bal, err := s.getBalanceWithQueries(ctx, q, k.AccountHolder, k.CurrencyID, k.ClassificationID)
+		if err != nil {
+			return fmt.Errorf("postgres: post journal: require non-negative: %w", err)
+		}
+		if bal.Sign() >= 0 {
+			continue
+		}
+		cls, err := q.GetClassification(ctx, k.ClassificationID)
+		if err != nil {
+			return fmt.Errorf("postgres: post journal: require non-negative: classification %d: %w", k.ClassificationID, err)
+		}
+		var debits, credits decimal.Decimal
+		for _, e := range input.Entries {
+			if e.AccountHolder != k.AccountHolder || e.CurrencyID != k.CurrencyID || e.ClassificationID != k.ClassificationID {
+				continue
+			}
+			if e.EntryType == core.EntryTypeDebit {
+				debits = debits.Add(e.Amount)
+			} else {
+				credits = credits.Add(e.Amount)
+			}
+		}
+		change := debits.Sub(credits)
+		if core.NormalSide(cls.NormalSide) == core.NormalSideCredit {
+			change = credits.Sub(debits)
+		}
+		return &core.NegativeBalanceError{Key: k, Balance: bal, Change: change}
+	}
+	return nil
 }
 
 func (s *LedgerStore) renderTemplate(ctx context.Context, q queryProvider, templateCode string, params core.TemplateParams) (*core.JournalInput, error) {
@@ -360,7 +449,16 @@ func (s *LedgerStore) postJournalWithQueries(ctx context.Context, q *sqlcgen.Que
 	// preventing TOCTOU races where a reserve reads stale balance while a journal
 	// is being committed. Locks are taken in lexicographic (holder, currency_id)
 	// order to avoid deadlocks when two journals touch overlapping pairs.
-	if err := acquireBalanceLocks(ctx, q, balancePairsFromEntries(input.Entries)); err != nil {
+	// A RequireNonNegative balance the journal doesn't touch is locked too,
+	// so the check reads it under the same lock as everything else.
+	lockSet := input.Entries
+	if len(input.RequireNonNegative) > 0 {
+		lockSet = append(append([]core.EntryInput(nil), input.Entries...), make([]core.EntryInput, len(input.RequireNonNegative))...)
+		for i, k := range input.RequireNonNegative {
+			lockSet[len(input.Entries)+i] = core.EntryInput{AccountHolder: k.AccountHolder, CurrencyID: k.CurrencyID}
+		}
+	}
+	if err := acquireBalanceLocks(ctx, q, balancePairsFromEntries(lockSet)); err != nil {
 		return nil, err
 	}
 
@@ -432,6 +530,10 @@ func (s *LedgerStore) postJournalWithQueries(ctx context.Context, q *sqlcgen.Que
 	}
 	if err == nil {
 		return nil, fmt.Errorf("postgres: post journal: journal %d unbalanced in currency %d: %w", row.ID, badCurrency, core.ErrUnbalancedJournal)
+	}
+
+	if err := s.checkNonNegative(ctx, q, input); err != nil {
+		return nil, err
 	}
 
 	if input.EventID != 0 {

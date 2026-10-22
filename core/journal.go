@@ -54,6 +54,12 @@ type JournalInput struct {
 	Source         string            `json:"source"`
 	ReversalOf     int64             `json:"reversal_of"`
 	EventID        int64             `json:"event_id"`
+	// RequireNonNegative lists balances this journal must not leave below
+	// zero (on each classification's normal side), checked after the
+	// entries are written, under the balance locks the post already holds.
+	// A breach fails the post with *NegativeBalanceError. Not stored: an
+	// idempotent replay moves no money, so it is not re-checked.
+	RequireNonNegative []BalanceKey `json:"require_non_negative,omitempty"`
 }
 
 func (j *JournalInput) Totals() (debit, credit decimal.Decimal) {
@@ -98,6 +104,11 @@ func (j *JournalInput) Validate() error {
 		return fmt.Errorf("core: journal: entries must not be empty: %w", ErrInvalidInput)
 	}
 	for i, e := range j.Entries {
+		// Magnitude first: adding decimals with different exponents
+		// rescales them, which is where a pathological amount costs.
+		if err := ValidateAmountMagnitude(e.Amount); err != nil {
+			return fmt.Errorf("core: journal: entry[%d]: %w", i, err)
+		}
 		if e.AccountHolder == 0 {
 			return fmt.Errorf("core: journal: entry[%d]: account_holder must not be zero: %w", i, ErrInvalidInput)
 		}
@@ -106,6 +117,11 @@ func (j *JournalInput) Validate() error {
 		}
 		if !e.Amount.IsPositive() {
 			return fmt.Errorf("core: journal: entry[%d]: amount must be positive: %w", i, ErrInvalidInput)
+		}
+	}
+	for i, k := range j.RequireNonNegative {
+		if k.AccountHolder == 0 || k.CurrencyID <= 0 || k.ClassificationID <= 0 {
+			return fmt.Errorf("core: journal: require_non_negative[%d]: holder, currency and classification are required: %w", i, ErrInvalidInput)
 		}
 	}
 	totalsByCurrency := j.totalsByCurrency()

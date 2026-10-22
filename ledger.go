@@ -157,6 +157,33 @@ func (s *Service) DBTX() postgres.DBTX {
 // JournalWriter posts/reverses journals and executes templates.
 func (s *Service) JournalWriter() core.JournalWriter { return s.ledgerStore }
 
+// JournalReverser posts full reversals with caller-chosen idempotency keys.
+// Inside RunInTx (or on a WithTx clone) it runs in that transaction.
+func (s *Service) JournalReverser() core.JournalReverser { return s.ledgerStore }
+
+// Reader returns the schema-free read side (journal by key, sub-balances,
+// holder entries, trial balance, reversal-chain integrity), bound to the
+// same executor as the stores: inside RunInTx it sees the transaction's own
+// writes.
+func (s *Service) Reader() core.LedgerReader { return postgres.NewReader(s.DBTX()) }
+
+// NewReader returns a core.LedgerReader over any executor (a pool, a
+// transaction, a connection), for callers that hold an executor but not a
+// Service.
+func NewReader(db postgres.Querier) core.LedgerReader { return postgres.NewReader(db) }
+
+// LockBalances takes PostJournal's balance lock on every (holder,
+// currencyID) pair, in PostJournal's order, until the transaction ends. Use
+// it to read a balance, decide, and post as one step: nothing that posts to
+// those holders can commit in between. Valid only inside RunInTx or on a
+// WithTx clone; otherwise it returns core.ErrOutsideTransaction.
+//
+// The lock protocol (key and order) is the engine's, so a caller never
+// re-implements it.
+func (s *Service) LockBalances(ctx context.Context, currencyID int64, holders ...int64) error {
+	return s.ledgerStore.LockBalances(ctx, currencyID, holders...)
+}
+
 // TemplateBatchExecutor executes multiple templates atomically.
 func (s *Service) TemplateBatchExecutor() core.TemplateBatchExecutor { return s.ledgerStore }
 
@@ -289,6 +316,18 @@ func (s *Service) BalanceTrends() core.BalanceTrendReader { return s.balanceTren
 
 // Audit returns the read-only audit query interface.
 func (s *Service) Audit() core.AuditQuerier { return s.auditStore }
+
+// WithTx returns a Service clone with every store bound to tx, a
+// transaction the CALLER began and will commit or roll back: the ledger's
+// writes join it. Use it to compose ledger writes with a transaction you
+// already own; RunInTx is the variant that owns the transaction itself. The
+// clone is valid only while tx is open.
+func (s *Service) WithTx(tx pgx.Tx) *Service {
+	if tx == nil {
+		return s
+	}
+	return s.withTx(tx)
+}
 
 // withTx returns a short-lived Service clone with every store rebound to tx.
 // The clone shares pool and options with the original; only the store handles

@@ -36,6 +36,9 @@ func numericToDecimal(n pgtype.Numeric) (decimal.Decimal, error) {
 	if n.NaN {
 		return decimal.Zero, fmt.Errorf("postgres: convert: NaN numeric")
 	}
+	if n.InfinityModifier != pgtype.Finite {
+		return decimal.Zero, fmt.Errorf("postgres: convert: infinite numeric")
+	}
 	if n.Int == nil {
 		return decimal.Zero, nil
 	}
